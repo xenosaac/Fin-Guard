@@ -1,4 +1,4 @@
-# Auth0 Hackathon Strategy — "Authorized to Act"
+# Fin-Guard — Auth0 Hackathon Strategy ("Authorized to Act")
 
 > Deadline: **April 6, 2026, 5:00 PM PT** (< 48 hours)
 > Prize pool: **$10,000** ($5K / $2K / $1K + blog prizes)
@@ -106,7 +106,7 @@ The winning project needs to:
 
 ## 4. Idea Candidates
 
-### Idea A: AI Financial Guardian (RECOMMENDED)
+### Idea A: AI Fin-Guard (RECOMMENDED)
 
 **Concept**: An AI agent that monitors your financial accounts across multiple services (bank API, Google Sheets budgets, Slack notifications) and proactively alerts you to unusual spending patterns — but with a **zero-trust security model** where the agent can only READ financial data, never WRITE.
 
@@ -145,7 +145,7 @@ The winning project needs to:
 
 ---
 
-## 5. Recommended Pick: Idea A — Financial Guardian
+## 5. Recommended Pick: Idea A — Fin-Guard
 
 ### Why Idea A Over Others
 
@@ -252,9 +252,9 @@ Based on IC-validated signals from 100K+ hackathon submissions:
 
 ## 10. Blog Post Draft (for $250 bonus)
 
-> **Building a Read-Only Financial Guardian with Auth0 Token Vault**
+> **Building a Read-Only Fin-Guard with Auth0 Token Vault**
 >
-> Most AI agent demos show agents that DO things — send emails, book meetings, move files. But what about agents that WATCH things? Our Financial Guardian uses Auth0 Token Vault to connect to financial services with strictly read-only permissions. The agent monitors spending patterns across connected accounts, detects anomalies, and alerts the user via Slack — but it can never move money or modify data.
+> Most AI agent demos show agents that DO things — send emails, book meetings, move files. But what about agents that WATCH things? Our Fin-Guard uses Auth0 Token Vault to connect to financial services with strictly read-only permissions. The agent monitors spending patterns across connected accounts, detects anomalies, and alerts the user via Slack — but it can never move money or modify data.
 >
 > The key insight: Token Vault's per-connection scoping makes this zero-trust pattern trivial to implement. Each connected service gets its own OAuth scope, and the agent's tools enforce read-only at the code level. The audit trail shows every API call with its permission scope, giving users complete visibility.
 >
