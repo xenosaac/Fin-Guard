@@ -102,6 +102,10 @@ async def agent_onboard(request: Request, response: Response):
     sess = _get_sess(request, response)
     steps = []
 
+    # Clear stale CIBA and alerts from previous runs
+    ciba.clear_all()
+    clear_alerts()
+
     # Step 1-3: Auto-connect all services (session + global for analyzer compat)
     from app.auth import connect_service as _global_connect, is_connected as _global_is_connected
     for svc_id in ["financial_api", "google_sheets", "slack"]:
@@ -406,4 +410,5 @@ async def reset_demo(request: Request, response: Response):
     sess.audit_log.clear()
     sess.connections.clear()
     clear_alerts()
+    ciba.clear_all()
     return {"status": "reset"}
