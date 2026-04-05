@@ -10,10 +10,6 @@ class Settings(BaseSettings):
     auth0_audience: str = ""
     auth0_callback_url: str = "http://localhost:8000/callback"
 
-    # OpenAI (for LangGraph agent)
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
-
     # App
     app_secret_key: str = "change-me-in-production"
     frontend_url: str = "http://localhost:3000"
