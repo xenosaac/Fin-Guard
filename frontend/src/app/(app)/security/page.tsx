@@ -305,39 +305,6 @@ export default function SecurityPage() {
 
   return (
     <>
-      {/* CIBA Overlay */}
-      {cibaRequests.length > 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md p-6 bg-[#0a0a0a] border border-[#f59e0b]/40 rounded-2xl" style={{ boxShadow: "0 0 60px rgba(245,158,11,0.15)" }}>
-            <div className="flex items-center gap-2 mb-4">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] animate-pulse" />
-              <span className="text-[11px] font-bold tracking-[0.2em] text-[#f59e0b] uppercase" style={{ fontFamily: "'Space Grotesk'" }}>
-                CIBA Approval Required
-              </span>
-            </div>
-            {cibaRequests.map((req) => (
-              <div key={req.request_id} className="mb-4 p-4 border border-[#1a1a1a] bg-[#080808] rounded-xl">
-                <p className="text-[10px] font-mono text-zinc-400 mb-1">Action: <span className="text-white">{req.action}</span></p>
-                <p className="text-[10px] font-mono text-zinc-400 mb-1">Reason: <span className="text-zinc-300">{req.reason}</span></p>
-                <p className="text-[10px] font-mono text-zinc-400 mb-3">Risk: <span className="text-[#ef4444] font-bold uppercase">{req.risk_level}</span></p>
-                <div className="flex gap-2">
-                  <button onClick={() => handleCIBA(req.request_id, "approve")}
-                    className="flex-1 py-2 text-[10px] font-bold tracking-[0.15em] uppercase bg-[#00ffa3]/10 text-[#00ffa3] border border-[#00ffa3]/30 rounded-xl hover:bg-[#00ffa3]/20 active:scale-[0.97] transition-all duration-150">
-                    Approve
-                  </button>
-                  <button onClick={() => handleCIBA(req.request_id, "deny")}
-                    className="flex-1 py-2 text-[10px] font-bold tracking-[0.15em] uppercase bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/30 rounded-xl hover:bg-[#ef4444]/20 active:scale-[0.97] transition-all duration-150">
-                    Deny
-                  </button>
-                </div>
-              </div>
-            ))}
-            <p className="text-[9px] text-zinc-600 font-mono text-center mt-2">
-              The AI agent is paused. It cannot proceed until you decide.
-            </p>
-          </div>
-        </div>
-      )}
 
       {/* Page */}
       <div className="flex-1 overflow-y-auto bg-[#050505]">
