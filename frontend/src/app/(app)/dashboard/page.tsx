@@ -1,611 +1,452 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 
-/* -- Types ----------------------------------------------------------------- */
-
-interface Connection {
-  service_id: string;
-  label: string;
-  connected: boolean;
-  permission: string;
-}
-
-interface Alert {
-  id: string;
-  severity: string;
-  message: string;
-  timestamp: string;
-}
+/* ── Types ─────────────────────────────────────────────────────────── */
 
 interface AuditEntry {
-  id: string;
   timestamp: string;
   service: string;
   action: string;
-  permission_used: string;
   success: boolean;
   details: string;
 }
 
-interface AgentStatus {
-  state: "idle" | "analyzing";
-  last_run?: string;
-}
-
-interface DashboardData {
-  connections: Connection[];
-  recent_alerts: Alert[];
-  audit_log: AuditEntry[];
-  agent_status: AgentStatus;
-}
-
-interface SecurityScore {
-  overall_score: number;
-  grade: string;
-  dimensions: Record<string, number>;
-}
-
-interface ChatMessage {
-  role: "user" | "agent";
+interface AgentMessage {
+  id: number;
+  type: "system" | "agent" | "user" | "step" | "card";
   text: string;
+  status?: "pending" | "done" | "error";
   blocked?: boolean;
+  data?: any;
   ts: number;
 }
 
-interface CIBARequest {
-  id: string;
-  action: string;
-  reason: string;
+/* ── Helpers ───────────────────────────────────────────────────────── */
+
+let _msgId = 0;
+const msg = (type: AgentMessage["type"], text: string, extra?: Partial<AgentMessage>): AgentMessage => ({
+  id: ++_msgId, type, text, ts: Date.now(), ...extra,
+});
+
+function renderMd(raw: string) {
+  return raw
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/(?<!\w)_(.+?)_(?!\w)/g, "<em>$1</em>")
+    .replace(/^- (.+)$/gm, "• $1");
 }
 
-/* -- Service config -------------------------------------------------------- */
-
-const SERVICES: Record<string, { icon: string; label: string; badge: string }> = {
-  financial_api: { icon: "\uD83D\uDCB3", label: "PLAID_FINANCIAL", badge: "READ-ONLY" },
-  google_sheets: { icon: "\uD83D\uDCCA", label: "GSHEETS_BUDGET", badge: "READ-ONLY" },
-  slack:         { icon: "\uD83D\uDD14", label: "SLACK_ALERTS",    badge: "ALERT-ONLY" },
-};
-
-/* -- Component ------------------------------------------------------------- */
+/* ── Component ─────────────────────────────────────────────────────── */
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [score, setScore] = useState<SecurityScore | null>(null);
-  const [chat, setChat] = useState<ChatMessage[]>([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [ciba, setCiba] = useState<CIBARequest | null>(null);
-  const [cibaOpen, setCibaOpen] = useState(false);
-  const [cibaPendingCount, setCibaPendingCount] = useState(0);
-  const [now, setNow] = useState(new Date());
-  const [toast, setToast] = useState<string | null>(null);
-  const [writeBlocked, setWriteBlocked] = useState(false);
+  const [messages, setMessages] = useState<AgentMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [onboarded, setOnboarded] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [connCount, setConnCount] = useState(0);
+  const [score, setScore] = useState<number | null>(null);
+  const [grade, setGrade] = useState("");
+  const [profileName, setProfileName] = useState("");
 
-  const auditRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  /* -- Fetch helpers ------------------------------------------------------- */
+  const scrollChat = () => {
+    setTimeout(() => chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" }), 100);
+  };
 
-  const fetchDashboard = useCallback(async () => {
+  const addMsg = (m: AgentMessage) => {
+    setMessages(prev => [...prev, m]);
+    scrollChat();
+  };
+
+  const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+  /* ── Auto-onboard on first visit ──────────────────────────────── */
+
+  const runOnboarding = useCallback(async () => {
+    if (onboarded || onboarding) return;
+    setOnboarding(true);
+
+    // Fetch profile name
     try {
-      const res = await fetch("/api/dashboard");
-      if (!res.ok) return;
-      const d: DashboardData = await res.json();
-      setData(d);
-    } catch { /* swallow */ }
-  }, []);
-
-  const fetchScore = useCallback(async () => {
-    try {
-      const res = await fetch("/api/security-score");
-      if (!res.ok) return;
-      setScore(await res.json());
-    } catch { /* swallow */ }
-  }, []);
-
-  const fetchCibaPending = useCallback(async () => {
-    try {
-      const res = await fetch("/api/ciba/pending");
-      if (!res.ok) {
-        setCibaPendingCount(0);
-        setCiba(null);
-        return;
+      const pRes = await fetch("/api/user/profile");
+      if (pRes.ok) {
+        const p = await pRes.json();
+        setProfileName(p.name || "");
+        addMsg(msg("agent",
+          `Welcome. I'm **Fin-Guard**, your read-only AI financial guardian.\n\nI'll connect your accounts, scan your transactions, and flag anything unusual — but I can **never** modify your data. Every action I take is verified by Auth0 FGA before execution.\n\nLet me set things up for you, ${p.nickname || p.name?.split(" ")[0] || "there"}...`
+        ));
       }
-      const body = await res.json();
-      // body can be a single request object or an array
-      const pending: CIBARequest | null = Array.isArray(body)
-        ? body.length > 0 ? body[0] : null
-        : body?.id ? body : null;
-      const count = Array.isArray(body) ? body.length : (body?.id ? 1 : 0);
-      setCibaPendingCount(count);
-      setCiba(pending);
+    } catch {}
+
+    await delay(1200);
+
+    // Call onboard endpoint
+    try {
+      addMsg(msg("step", "Connecting to financial services via Token Vault...", { status: "pending" }));
+      await delay(600);
+
+      const res = await fetch("/api/agent/onboard", { method: "POST" });
+      if (!res.ok) throw new Error("Onboard failed");
+      const data = await res.json();
+
+      // Show connection steps
+      for (const step of data.steps) {
+        if (step.step.startsWith("connect_")) {
+          setMessages(prev => {
+            const updated = [...prev];
+            const pendingIdx = updated.findLastIndex(m => m.type === "step" && m.status === "pending");
+            if (pendingIdx >= 0) updated[pendingIdx] = { ...updated[pendingIdx], status: "done", text: step.message };
+            return updated;
+          });
+          await delay(500);
+          if (step.step !== "connect_slack") {
+            addMsg(msg("step", "Connecting next service...", { status: "pending" }));
+            await delay(400);
+          }
+        }
+      }
+
+      // Show analysis step
+      addMsg(msg("step", "All services connected. Running financial analysis...", { status: "pending" }));
+      await delay(800);
+
+      const analyzeStep = data.steps.find((s: any) => s.step === "analyze");
+      if (analyzeStep) {
+        setMessages(prev => {
+          const updated = [...prev];
+          const pendingIdx = updated.findLastIndex(m => m.type === "step" && m.status === "pending");
+          if (pendingIdx >= 0) updated[pendingIdx] = { ...updated[pendingIdx], status: "done", text: analyzeStep.message };
+          return updated;
+        });
+      }
+
+      await delay(600);
+
+      // Show summary as agent message
+      const summary = data.analysis?.summary || "Analysis complete.";
+      addMsg(msg("agent", summary));
+
+      await delay(400);
+
+      // Suggestion cards
+      addMsg(msg("card", "", {
+        data: {
+          title: "What would you like to do?",
+          suggestions: [
+            { label: "Show me suspicious transactions", icon: "🔍" },
+            { label: "Check my budget status", icon: "📊" },
+            { label: "Run a security threat test", icon: "🛡️" },
+            { label: "Try to transfer money (I'll block it)", icon: "⚠️" },
+          ]
+        }
+      }));
+
+      setConnCount(3);
+      // Fetch score
+      try {
+        const sRes = await fetch("/api/security-score");
+        if (sRes.ok) {
+          const s = await sRes.json();
+          setScore(s.overall_score);
+          setGrade(s.grade);
+        }
+      } catch {}
+
     } catch {
-      setCibaPendingCount(0);
-      setCiba(null);
+      addMsg(msg("agent", "Something went wrong during setup. Try refreshing the page."));
     }
+
+    setOnboarded(true);
+    setOnboarding(false);
+
+    // Fetch audit log
+    try {
+      const aRes = await fetch("/api/dashboard");
+      if (aRes.ok) {
+        const d = await aRes.json();
+        setAuditLog(d.audit_log || []);
+        setConnCount(d.connections?.filter((c: any) => c.connected).length || 0);
+      }
+    } catch {}
+  }, [onboarded, onboarding]);
+
+  useEffect(() => {
+    runOnboarding();
   }, []);
 
-  /* -- Polling ------------------------------------------------------------- */
-
+  // Poll audit log
   useEffect(() => {
-    fetchDashboard();
-    fetchScore();
-    fetchCibaPending();
-    const id = setInterval(() => {
-      fetchDashboard();
-      fetchCibaPending();
-    }, 4000);
-    const clock = setInterval(() => setNow(new Date()), 1000);
-    return () => { clearInterval(id); clearInterval(clock); };
-  }, [fetchDashboard, fetchScore, fetchCibaPending]);
+    if (!onboarded) return;
+    const iv = setInterval(async () => {
+      try {
+        const res = await fetch("/api/dashboard");
+        if (res.ok) {
+          const d = await res.json();
+          setAuditLog(d.audit_log || []);
+        }
+      } catch {}
+    }, 5000);
+    return () => clearInterval(iv);
+  }, [onboarded]);
 
-  /* auto-scroll audit + chat */
-  useEffect(() => {
-    auditRef.current?.scrollTo({ top: auditRef.current.scrollHeight, behavior: "smooth" });
-  }, [data?.audit_log.length]);
+  /* ── Send chat message ───────────────────────────────────────── */
 
-  useEffect(() => {
-    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
-  }, [chat.length, chatLoading]);
+  const sendChat = async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+    setInput("");
+    addMsg(msg("user", text));
+    setLoading(true);
 
-  /* -- Actions ------------------------------------------------------------- */
-
-  async function toggleConnection(serviceId: string, connected: boolean) {
-    const action = connected ? "disconnect" : "connect";
-    await fetch(`/api/connections/${serviceId}/${action}`, { method: "POST" });
-    fetchDashboard();
-    fetchScore();
-  }
-
-  async function runAnalysis() {
-    setAnalyzing(true);
     try {
-      const res = await fetch("/api/analyze", { method: "POST" });
-      const body = await res.json().catch(() => ({}));
-      const txCount = body.transactions_scanned ?? body.scanned ?? "—";
-      const anomalies = body.anomalies_found ?? body.anomalies ?? 0;
-      setToast(`Analysis complete. ${txCount} transactions scanned, ${anomalies} anomalies found.`);
-      setTimeout(() => setToast(null), 4000);
-    } catch { /* swallow */ }
-    setAnalyzing(false);
-    await fetchDashboard();
-    fetchScore();
-    // auto-scroll audit trail to show new entries
-    setTimeout(() => {
-      auditRef.current?.scrollTo({ top: auditRef.current.scrollHeight, behavior: "smooth" });
-    }, 200);
-  }
-
-  async function attemptWrite() {
-    setWriteBlocked(true);
-    await fetch("/api/analyze", { method: "POST", headers: { "x-attempt": "write" } });
-    await fetchDashboard();
-    // revert button text after 1 second
-    setTimeout(() => setWriteBlocked(false), 1000);
-    // auto-scroll audit trail to show the new BLOCKED entry
-    setTimeout(() => {
-      auditRef.current?.scrollTo({ top: auditRef.current.scrollHeight, behavior: "smooth" });
-    }, 200);
-  }
-
-  async function sendChat() {
-    const msg = chatInput.trim();
-    if (!msg) return;
-    setChat((prev) => [...prev, { role: "user", text: msg, ts: Date.now() }]);
-    setChatInput("");
-    setChatLoading(true);
-    try {
-      const res = await fetch(`/api/chat?message=${encodeURIComponent(msg)}`, { method: "POST" });
+      const res = await fetch(`/api/chat?message=${encodeURIComponent(text)}`, { method: "POST" });
       const body = await res.json();
-      setChat((prev) => [
-        ...prev,
-        { role: "agent", text: body.response ?? body.message ?? "No response.", blocked: body.blocked ?? false, ts: Date.now() },
-      ]);
+      addMsg(msg("agent", body.response || "No response.", {
+        blocked: body.blocked,
+        data: body.tools_used?.length ? { tools: body.tools_used } : undefined,
+      }));
+
+      // Refresh audit
+      const aRes = await fetch("/api/dashboard");
+      if (aRes.ok) {
+        const d = await aRes.json();
+        setAuditLog(d.audit_log || []);
+      }
     } catch {
-      setChat((prev) => [...prev, { role: "agent", text: "Connection error.", ts: Date.now() }]);
+      addMsg(msg("agent", "Connection error. Backend may be offline."));
     }
-    setChatLoading(false);
-    fetchDashboard();
-  }
+    setLoading(false);
+    inputRef.current?.focus();
+  };
 
-  async function respondCiba(approved: boolean) {
-    if (!ciba) return;
-    await fetch(`/api/ciba/${ciba.id}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approved }),
-    });
-    setCiba(null);
-    setCibaOpen(false);
-    setCibaPendingCount((c) => Math.max(0, c - 1));
-    fetchDashboard();
-    fetchCibaPending();
-  }
+  const handleSuggestion = async (text: string) => {
+    if (loading) return;
+    addMsg(msg("user", text));
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/chat?message=${encodeURIComponent(text)}`, { method: "POST" });
+      const body = await res.json();
+      addMsg(msg("agent", body.response || "No response.", {
+        blocked: body.blocked,
+        data: body.tools_used?.length ? { tools: body.tools_used } : undefined,
+      }));
+      const aRes = await fetch("/api/dashboard");
+      if (aRes.ok) { const d = await aRes.json(); setAuditLog(d.audit_log || []); }
+    } catch {
+      addMsg(msg("agent", "Connection error."));
+    }
+    setLoading(false);
+  };
 
-  /* -- Markdown helper ------------------------------------------------------ */
-
-  function renderMarkdown(text: string): string {
-    return text
-      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-      .replace(/(?<!\w)_(.+?)_(?!\w)/g, "<em>$1</em>")
-      .replace(/^- (.+)$/gm, "\u2022 $1");
-  }
-
-  /* -- Derived ------------------------------------------------------------- */
-
-  const connections = data?.connections ?? [];
-  const connectedCount = connections.filter((c) => c.connected).length;
-  const totalAlerts = data?.recent_alerts?.length ?? 0;
-  const agentState = data?.agent_status?.state ?? "idle";
-  const auditLog = data?.audit_log ?? [];
-
-  const gradeColor = (g: string) =>
-    g === "A" || g === "A+" ? "#00ffa3" : g === "B" ? "#facc15" : "#ef4444";
-
-  /* -- Render -------------------------------------------------------------- */
+  /* ── Render ──────────────────────────────────────────────────── */
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#050505]">
-      {/* scanning line when analyzing */}
-      {(analyzing || agentState === "analyzing") && <div className="scanning-line" />}
 
-      {/* Toast notification */}
-      {toast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 fade-in">
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-[#0a1a12] border border-[#00ffa3]/20 rounded-xl shadow-lg shadow-[#00ffa3]/10">
-            <svg className="w-3.5 h-3.5 text-[#00ffa3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span className="text-[10px] font-mono text-zinc-300">{toast}</span>
-          </div>
-        </div>
-      )}
-
-      {/* -- Top Summary Bar ------------------------------------------------ */}
-      <header className="shrink-0 flex items-center gap-6 px-5 py-3 bg-[#080808] border-b border-[#111]">
-        {/* Security Score */}
-        <div className="flex items-center gap-2.5">
-          <span className="text-[22px] font-bold tracking-tight text-[#00ffa3]" style={{ fontFamily: "'Space Grotesk'" }}>
-            {score ? score.overall_score : "--"}
+      {/* ── Top Bar ────────────────────────────────────────────── */}
+      <header className="shrink-0 flex items-center gap-4 px-5 py-3 bg-[#080808] border-b border-[#111]">
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-[#00ffa3] shield-glow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          <span className="text-[11px] font-bold tracking-[0.1em] text-[#00ffa3] uppercase" style={{ fontFamily: "'Space Grotesk'" }}>
+            Agent Active
           </span>
-          {score && (
-            <span
-              className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg"
-              style={{ color: gradeColor(score.grade), border: `1px solid ${gradeColor(score.grade)}33` }}
-            >
-              {score.grade}
-            </span>
-          )}
-          <span className="text-[9px] text-zinc-600 uppercase tracking-wider font-mono">Security</span>
         </div>
 
-        <div className="w-px h-5 bg-[#1a1a1a]" />
+        <div className="w-px h-4 bg-[#1a1a1a]" />
 
-        {/* Connected */}
-        <div className="flex items-center gap-2">
-          <span className="text-[14px] font-semibold text-white" style={{ fontFamily: "'Space Grotesk'" }}>{connectedCount}/3</span>
-          <span className="text-[9px] text-zinc-600 uppercase tracking-wider font-mono">Connected</span>
-        </div>
-
-        <div className="w-px h-5 bg-[#1a1a1a]" />
-
-        {/* Alerts */}
-        <div className="flex items-center gap-2">
-          <span className={`text-[14px] font-semibold ${totalAlerts > 0 ? "text-amber-400" : "text-white"}`} style={{ fontFamily: "'Space Grotesk'" }}>
-            {totalAlerts}
-          </span>
-          <span className="text-[9px] text-zinc-600 uppercase tracking-wider font-mono">Alerts</span>
-        </div>
-
-        <div className="w-px h-5 bg-[#1a1a1a]" />
-
-        {/* Agent status */}
-        <div className="flex items-center gap-2">
-          <span className={`w-1.5 h-1.5 rounded-full ${agentState === "analyzing" ? "bg-[#00ffa3] ring-pulse" : "bg-zinc-600"}`} />
-          <span className="text-[9px] text-zinc-500 uppercase tracking-wider font-mono">{agentState}</span>
-        </div>
-
-        {/* spacer */}
-        <div className="flex-1" />
-
-        {/* CIBA notification badge */}
-        {cibaPendingCount > 0 && (
-          <button
-            onClick={() => setCibaOpen(true)}
-            className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:shadow-lg hover:shadow-amber-500/10 active:scale-[0.97] transition-all duration-150"
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-              <line x1="12" y1="8" x2="12" y2="12" />
-              <circle cx="12" cy="15" r="0.5" fill="currentColor" />
-            </svg>
-            <span className="text-[9px] font-bold uppercase tracking-widest font-mono">CIBA</span>
-            <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-[8px] font-bold text-black">
-              {cibaPendingCount}
-            </span>
-          </button>
+        {score !== null && (
+          <>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[14px] font-bold text-[#00ffa3]" style={{ fontFamily: "'Space Grotesk'" }}>{score}</span>
+              <span className="text-[8px] font-bold px-1.5 py-0.5 rounded-full text-[#00ffa3] border border-[#00ffa3]/20">{grade}</span>
+            </div>
+            <div className="w-px h-4 bg-[#1a1a1a]" />
+          </>
         )}
 
-        {/* Clock */}
-        <span className="text-[9px] text-zinc-600 font-mono tabular-nums tracking-wider">
-          {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
-          {" \u00B7 "}
-          {now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[12px] font-semibold text-white" style={{ fontFamily: "'Space Grotesk'" }}>{connCount}/3</span>
+          <span className="text-[9px] text-zinc-600 font-mono uppercase">Vault</span>
+        </div>
+
+        <div className="flex-1" />
+
+        <button
+          onClick={() => setAuditOpen(!auditOpen)}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500 border border-[#1a1a1a] rounded-lg hover:border-zinc-600 hover:text-zinc-300 active:scale-[0.97] transition-all"
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#00ffa3] animate-pulse" />
+          Audit Trail ({auditLog.length})
+        </button>
       </header>
 
-      {/* -- Main Grid ------------------------------------------------------ */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] overflow-hidden">
+      {/* ── Main Area ──────────────────────────────────────────── */}
+      <div className="flex-1 flex overflow-hidden">
 
-        {/* --- Left: Token Vault ------------------------------------------- */}
-        <section className="flex flex-col overflow-y-auto border-r border-[#111] bg-[#080808] p-4 gap-4">
-          <h2 className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Token Vault</h2>
+        {/* ── Chat (Agent-First) ───────────────────────────────── */}
+        <div className="flex-1 flex flex-col">
 
-          {/* Status ring */}
-          <div className="flex justify-center py-2">
-            <svg width="80" height="80" viewBox="0 0 80 80">
-              <circle cx="40" cy="40" r="34" fill="none" stroke="#1a1a1a" strokeWidth="4" />
-              <circle
-                cx="40" cy="40" r="34" fill="none" stroke="#00ffa3" strokeWidth="4"
-                strokeDasharray={`${(connectedCount / 3) * 213.6} 213.6`}
-                strokeLinecap="round" transform="rotate(-90 40 40)"
-                className="transition-all duration-700"
-              />
-              <text x="40" y="38" textAnchor="middle" fill="white" fontSize="18" fontWeight="bold" style={{ fontFamily: "'Space Grotesk'" }}>
-                {connectedCount}
-              </text>
-              <text x="40" y="50" textAnchor="middle" fill="#666" fontSize="8" fontFamily="monospace">/3 LINKED</text>
-            </svg>
-          </div>
+          <div ref={chatRef} className="flex-1 overflow-y-auto px-4 lg:px-8 py-6">
+            <div className="max-w-2xl mx-auto space-y-4">
+              {messages.map((m) => {
 
-          {/* Service cards */}
-          {(["financial_api", "google_sheets", "slack"] as const).map((svcId) => {
-            const svc = SERVICES[svcId];
-            const conn = connections.find((c) => c.service_id === svcId);
-            const isConn = conn?.connected ?? false;
-            return (
-              <div key={svcId} className={`p-3 rounded-xl transition-all duration-150 ${isConn ? "bg-[#0a1a12]" : "bg-[#0c0c0c]"}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm">{svc.icon}</span>
-                  <span className="text-[10px] font-mono text-zinc-300 tracking-wide flex-1">{svc.label}</span>
-                  <span className={`w-1.5 h-1.5 rounded-full ${isConn ? "bg-[#00ffa3]" : "bg-zinc-700"}`} />
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 bg-[#111] text-zinc-500 rounded-lg">
-                    {svc.badge}
-                  </span>
-                  <button
-                    onClick={() => toggleConnection(svcId, isConn)}
-                    className={`text-[9px] font-mono uppercase tracking-wider px-2 py-1 rounded-lg active:scale-[0.97] transition-all duration-150 ${
-                      isConn
-                        ? "text-red-400 bg-red-400/5 hover:bg-red-400/10 hover:shadow-lg hover:shadow-red-400/5"
-                        : "text-[#00ffa3] bg-[#00ffa3]/5 hover:bg-[#00ffa3]/10 hover:shadow-lg hover:shadow-[#00ffa3]/5"
-                    }`}
-                  >
-                    {isConn ? "Disconnect" : "Connect"}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          {/* Action buttons */}
-          <button
-            onClick={runAnalysis}
-            disabled={analyzing}
-            className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest bg-[#00ffa3] text-[#050505] rounded-lg hover:brightness-110 hover:shadow-lg hover:shadow-[#00ffa3]/20 active:scale-[0.97] transition-all duration-150 disabled:opacity-40"
-            style={{ fontFamily: "'Space Grotesk'" }}
-          >
-            {analyzing ? (
-              <>
-                <svg className="inline-block w-3 h-3 mr-1.5 animate-spin" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
-                  <path d="M12 2a10 10 0 019.95 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
-                </svg>
-                Analyzing&hellip;
-              </>
-            ) : "Run Analysis"}
-          </button>
-
-          <button
-            onClick={attemptWrite}
-            disabled={writeBlocked}
-            className={`w-full py-2 text-[10px] font-mono uppercase tracking-widest rounded-lg active:scale-[0.97] transition-all duration-150 ${
-              writeBlocked
-                ? "text-white bg-red-500 border border-red-500 shadow-lg shadow-red-500/30 animate-[flash-red_0.3s_ease-out]"
-                : "text-red-400 border border-red-400/20 hover:bg-red-400/5 hover:shadow-lg hover:shadow-red-400/5"
-            }`}
-          >
-            {writeBlocked ? "BLOCKED" : "Attempt Write (Blocked)"}
-          </button>
-        </section>
-
-        {/* --- Center: AI Agent Chat --------------------------------------- */}
-        <section className="flex flex-col overflow-hidden bg-[#050505]">
-          {/* Header */}
-          <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-[#111]">
-            <svg className="w-3.5 h-3.5 text-[#00ffa3] shield-glow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-            <span className="text-[10px] text-zinc-400 uppercase tracking-widest font-mono">Guardian Agent</span>
-          </div>
-
-          {/* Messages */}
-          <div ref={chatRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-            {chat.length === 0 && !chatLoading && (
-              <div className="flex flex-col items-center justify-center h-full gap-4 fade-in">
-                <svg className="w-8 h-8 text-zinc-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
-                <p className="text-[10px] text-zinc-600 font-mono text-center max-w-xs leading-relaxed">
-                  Fin-Guard agent is watching your accounts in read-only mode. Ask anything about your finances.
-                </p>
-                <div className="flex flex-wrap gap-2 justify-center max-w-sm">
-                  {[
-                    "Summarize my spending this month",
-                    "Any unusual transactions?",
-                    "What's my budget status?",
-                    "Transfer $100 to savings",
-                  ].map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => { setChatInput(q); }}
-                      className="text-[9px] font-mono text-zinc-500 px-2.5 py-1.5 bg-[#0a0a0a] hover:bg-[#111] hover:text-zinc-300 hover:shadow-lg rounded-lg active:scale-[0.97] transition-all duration-150"
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {chat.map((msg, i) => (
-              <div
-                key={i}
-                className={`fade-in flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[80%] px-3 py-2.5 rounded-xl ${
-                    msg.role === "user"
-                      ? "bg-[#00ffa3]/8 text-zinc-200"
-                      : msg.blocked
-                        ? "bg-[#1a0808] border border-red-500/30"
-                        : "bg-[#0a0a0a] text-zinc-300"
-                  }`}
-                >
-                  {msg.role === "agent" && (
-                    <div className="flex items-center gap-1.5 mb-1.5">
-                      <svg className="w-2.5 h-2.5 text-[#00ffa3]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                      </svg>
-                      {msg.blocked && (
-                        <span className="text-[8px] font-bold text-red-400 uppercase tracking-widest">Access Denied</span>
+                /* System / Step messages */
+                if (m.type === "step") {
+                  return (
+                    <div key={m.id} className="flex items-center gap-3 fade-in">
+                      {m.status === "pending" ? (
+                        <div className="w-4 h-4 border-2 border-[#00ffa3]/30 border-t-[#00ffa3] rounded-full animate-spin shrink-0" />
+                      ) : (
+                        <svg className="w-4 h-4 text-[#00ffa3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12" /></svg>
                       )}
+                      <span className={`text-[11px] font-mono ${m.status === "done" ? "text-zinc-400" : "text-zinc-500"}`}>
+                        {m.text}
+                      </span>
                     </div>
-                  )}
-                  {msg.role === "agent" ? (
-                    <p
-                      className="text-[11px] leading-relaxed font-mono whitespace-pre-wrap"
-                      dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }}
-                    />
-                  ) : (
-                    <p className="text-[11px] leading-relaxed font-mono whitespace-pre-wrap">{msg.text}</p>
-                  )}
-                  <span className="block text-[8px] text-zinc-700 mt-1 font-mono">
-                    {new Date(msg.ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
-                  </span>
-                </div>
-              </div>
-            ))}
+                  );
+                }
 
-            {chatLoading && (
-              <div className="flex justify-start fade-in">
-                <div className="bg-[#0a0a0a] px-3 py-2.5 rounded-xl">
-                  <div className="flex gap-1">
-                    <span className="w-1 h-1 rounded-full bg-zinc-600 animate-pulse" style={{ animationDelay: "0ms" }} />
-                    <span className="w-1 h-1 rounded-full bg-zinc-600 animate-pulse" style={{ animationDelay: "150ms" }} />
-                    <span className="w-1 h-1 rounded-full bg-zinc-600 animate-pulse" style={{ animationDelay: "300ms" }} />
+                /* Agent messages */
+                if (m.type === "agent") {
+                  return (
+                    <div key={m.id} className="fade-in">
+                      <div className={`p-4 rounded-2xl ${m.blocked ? "bg-red-950/20 border border-red-500/20" : "bg-[#0a0a0a] border border-[#1a1a1a]"}`}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <svg className={`w-3.5 h-3.5 ${m.blocked ? "text-red-400" : "text-[#00ffa3]"}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                          </svg>
+                          <span className={`text-[9px] font-bold tracking-[0.15em] uppercase ${m.blocked ? "text-red-400" : "text-[#00ffa3]"}`}>
+                            {m.blocked ? "Fin-Guard — Access Denied" : "Fin-Guard"}
+                          </span>
+                          {m.data?.tools && (
+                            <span className="text-[8px] font-mono text-zinc-600 ml-auto">
+                              tools: {m.data.tools.join(", ")}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[12px] text-zinc-300 leading-relaxed whitespace-pre-wrap"
+                          dangerouslySetInnerHTML={{ __html: renderMd(m.text) }} />
+                      </div>
+                    </div>
+                  );
+                }
+
+                /* User messages */
+                if (m.type === "user") {
+                  return (
+                    <div key={m.id} className="flex justify-end fade-in">
+                      <div className="max-w-[75%] px-4 py-3 bg-[#00ffa3]/8 border border-[#00ffa3]/15 rounded-2xl">
+                        <p className="text-[12px] text-zinc-200 leading-relaxed">{m.text}</p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                /* Suggestion cards */
+                if (m.type === "card" && m.data?.suggestions) {
+                  return (
+                    <div key={m.id} className="fade-in">
+                      <p className="text-[11px] text-zinc-500 mb-2 font-medium">{m.data.title}</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {m.data.suggestions.map((s: any) => (
+                          <button key={s.label}
+                            onClick={() => handleSuggestion(s.label)}
+                            className="flex items-center gap-2.5 px-4 py-3 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl hover:border-[#00ffa3]/30 hover:bg-[#0a0a0a] active:scale-[0.97] transition-all text-left group"
+                          >
+                            <span className="text-lg">{s.icon}</span>
+                            <span className="text-[11px] text-zinc-400 group-hover:text-zinc-200 transition-colors leading-snug">{s.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return null;
+              })}
+
+              {loading && (
+                <div className="fade-in">
+                  <div className="p-4 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3.5 h-3.5 border-2 border-[#00ffa3]/30 border-t-[#00ffa3] rounded-full animate-spin" />
+                      <span className="text-[10px] text-zinc-500 font-mono">Agent is thinking...</span>
+                    </div>
                   </div>
                 </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Input ──────────────────────────────────────────── */}
+          <div className="shrink-0 px-4 lg:px-8 py-4 border-t border-[#111] bg-[#080808]">
+            <form onSubmit={(e) => { e.preventDefault(); sendChat(); }} className="max-w-2xl mx-auto">
+              <div className="flex gap-3">
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask your financial guardian anything..."
+                  className="flex-1 px-4 py-3 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl text-[12px] text-zinc-200 placeholder-zinc-700 focus:border-[#00ffa3]/30 focus:outline-none transition-all"
+                />
+                <button type="submit" disabled={loading || !input.trim()}
+                  className="px-5 py-3 bg-[#00ffa3] text-black text-[10px] font-bold tracking-[0.15em] uppercase rounded-xl disabled:opacity-30 hover:bg-[#00ef99] active:scale-[0.97] transition-all"
+                  style={{ fontFamily: "'Space Grotesk'" }}>
+                  Send
+                </button>
               </div>
-            )}
+              <div className="flex items-center gap-4 mt-2 px-1">
+                <span className="text-[9px] text-zinc-700 font-mono">Every tool call verified by Auth0 FGA</span>
+                <span className="text-[9px] text-zinc-700 font-mono">•</span>
+                <span className="text-[9px] text-zinc-700 font-mono">Read-only by design</span>
+              </div>
+            </form>
           </div>
+        </div>
 
-          {/* Input */}
-          <form
-            onSubmit={(e) => { e.preventDefault(); sendChat(); }}
-            className="shrink-0 flex items-center gap-2 px-4 py-3 border-t border-[#111]"
-          >
-            <input
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              placeholder="Ask the guardian agent..."
-              className="flex-1 bg-[#0a0a0a] text-[11px] text-zinc-300 font-mono px-3 py-2 rounded-lg outline-none placeholder:text-zinc-700 focus:ring-1 focus:ring-[#00ffa3]/20 transition-all duration-150"
-            />
-            <button
-              type="submit"
-              disabled={chatLoading || !chatInput.trim()}
-              className="text-[9px] font-mono uppercase tracking-wider px-3 py-2 bg-[#00ffa3]/10 text-[#00ffa3] rounded-lg hover:bg-[#00ffa3]/20 hover:shadow-lg hover:shadow-[#00ffa3]/10 active:scale-[0.97] transition-all duration-150 disabled:opacity-30"
-            >
-              Send
-            </button>
-          </form>
-        </section>
-
-        {/* --- Right: Audit Trail ------------------------------------------ */}
-        <section className="flex flex-col overflow-hidden border-l border-[#111] bg-[#080808]">
-          {/* Header */}
-          <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-[#111]">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00ffa3] opacity-40" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00ffa3]" />
-            </span>
-            <span className="text-[9px] text-[#00ffa3] uppercase tracking-widest font-mono font-bold">Live</span>
-            <span className="flex-1" />
-            <span className="text-[9px] text-zinc-600 font-mono">{auditLog.length} entries</span>
-          </div>
-
-          {/* Entries */}
-          <div ref={auditRef} className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
-            {auditLog.length === 0 && (
-              <p className="text-[9px] text-zinc-700 font-mono text-center py-8">No audit entries yet. Connect a service and run analysis.</p>
-            )}
-            {auditLog.map((entry, i) => {
-              const isBlocked = !entry.success;
-              return (
-                <div
-                  key={entry.id ?? i}
-                  className={`px-3 py-2 rounded-xl fade-in ${
-                    isBlocked
-                      ? "blocked-dramatic"
-                      : "bg-[#0a0a0a]"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {/* status icon */}
-                    {isBlocked ? (
-                      <svg className="w-3 h-3 text-red-400 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
+        {/* ── Audit Trail Panel (collapsible) ───────────────────── */}
+        {auditOpen && (
+          <div className="w-80 shrink-0 border-l border-[#111] bg-[#080808] flex flex-col overflow-hidden fade-in">
+            <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-[#111]">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00ffa3] opacity-40" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00ffa3]" />
+              </span>
+              <span className="text-[9px] text-[#00ffa3] uppercase tracking-widest font-mono font-bold">Live</span>
+              <span className="flex-1" />
+              <button onClick={() => setAuditOpen(false)} className="text-zinc-600 hover:text-zinc-400 transition">
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+              {auditLog.map((entry, i) => (
+                <div key={i} className={`px-3 py-2 rounded-lg text-[9px] font-mono ${!entry.success ? "bg-red-500/5 border-l-2 border-red-500" : "bg-[#0a0a0a]"}`}>
+                  <div className="flex items-center gap-1.5">
+                    {entry.success ? (
+                      <span className="text-[#00ffa3]">✓</span>
                     ) : (
-                      <svg className="w-3 h-3 text-[#00ffa3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
+                      <span className="text-red-400 font-bold">✗</span>
                     )}
-
-                    {/* service.action */}
-                    <span className="text-[10px] font-mono text-zinc-300 flex-1 truncate">
-                      {entry.service}.{entry.action}
-                    </span>
-
-                    {/* badge */}
-                    <span
-                      className={`text-[7px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-lg ${
-                        isBlocked
-                          ? "text-red-400 bg-red-400/10"
-                          : "text-[#00ffa3] bg-[#00ffa3]/10"
-                      }`}
-                    >
-                      {isBlocked ? "BLOCKED" : "READ"}
+                    <span className="text-zinc-300 truncate flex-1">{entry.service}.{entry.action}</span>
+                    <span className={`text-[7px] px-1 py-0.5 rounded-full ${entry.success ? "text-[#00ffa3] bg-[#00ffa3]/10" : "text-red-400 bg-red-500/10"}`}>
+                      {entry.success ? "READ" : "BLOCKED"}
                     </span>
                   </div>
-
-                  {/* details */}
-                  <p className="text-[8px] text-zinc-600 font-mono mt-1 truncate">{entry.details}</p>
-
-                  {/* timestamp */}
-                  <span className="text-[7px] text-zinc-700 font-mono">
-                    {new Date(entry.timestamp).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
-                  </span>
+                  <p className="text-zinc-600 mt-0.5 truncate">{entry.details}</p>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </section>
+        )}
       </div>
-
     </div>
   );
 }
