@@ -72,7 +72,42 @@ export default function DashboardPage() {
     if (onboarded || onboarding) return;
     setOnboarding(true);
 
-    // Fetch profile name
+    // Check if session already has chat history (returning user)
+    try {
+      const histRes = await fetch("/api/chat/history");
+      if (histRes.ok) {
+        const hist = await histRes.json();
+        if (Array.isArray(hist) && hist.length > 0) {
+          // Restore previous chat
+          const restored: AgentMessage[] = hist.map((h: any, i: number) => ({
+            id: i + 1,
+            type: h.role === "user" ? "user" as const : "agent" as const,
+            text: h.content,
+            ts: Date.now() - (hist.length - i) * 1000,
+          }));
+          _msgId = restored.length;
+          setMessages(restored);
+          setOnboarded(true);
+          setOnboarding(false);
+          // Fetch dashboard state
+          try {
+            const dRes = await fetch("/api/dashboard");
+            if (dRes.ok) {
+              const d = await dRes.json();
+              setAuditLog(d.audit_log || []);
+              setConnCount(d.connections?.filter((c: any) => c.connected).length || 0);
+            }
+            const sRes = await fetch("/api/security-score");
+            if (sRes.ok) { const s = await sRes.json(); setScore(s.overall_score); setGrade(s.grade); }
+            const pRes = await fetch("/api/user/profile");
+            if (pRes.ok) { const p = await pRes.json(); setProfileName(p.name || ""); }
+          } catch {}
+          return;
+        }
+      }
+    } catch {}
+
+    // Fresh session — run onboarding
     try {
       const pRes = await fetch("/api/user/profile");
       if (pRes.ok) {
@@ -407,6 +442,16 @@ export default function DashboardPage() {
                 <span className="text-[9px] text-zinc-700 font-mono">Every tool call verified by Auth0 FGA</span>
                 <span className="text-[9px] text-zinc-700 font-mono">•</span>
                 <span className="text-[9px] text-zinc-700 font-mono">Read-only by design</span>
+                <span className="flex-1" />
+                <button onClick={async () => {
+                  await fetch("/api/chat/clear", { method: "POST" });
+                  setMessages([]);
+                  setOnboarded(false);
+                  setOnboarding(false);
+                  _msgId = 0;
+                }} className="text-[9px] text-zinc-700 font-mono hover:text-zinc-400 transition">
+                  Clear chat
+                </button>
               </div>
             </form>
           </div>

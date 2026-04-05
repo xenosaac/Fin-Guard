@@ -194,7 +194,7 @@ export default function AlertsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {displayList.map((item) => {
+          {displayList.map((item, idx) => {
             const isFading = fadingOut.has(item.request_id);
             const isPending = item.status === "pending";
             const isApproved = item.status === "approved";
@@ -202,7 +202,7 @@ export default function AlertsPage() {
 
             return (
               <div
-                key={`${item.request_id}-${item.status}`}
+                key={`${item.request_id}-${item.status}-${idx}`}
                 className={`group bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl px-5 py-3.5
                   flex items-center gap-4 transition-all duration-400
                   ${isFading ? "opacity-0 scale-[0.98] translate-x-4" : "opacity-100"}
