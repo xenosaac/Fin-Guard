@@ -82,7 +82,7 @@ const SERVICE_META: Record<string, { label: string; desc: string }> = {
   },
   slack: {
     label: "SLACK_ALERTS",
-    desc: "Outbound alert channel. Notification delivery only.",
+    desc: "Outbound alert channel. Write: notifications only.",
   },
 };
 
@@ -116,12 +116,16 @@ export default function Dashboard() {
   }, [dash?.audit_log?.length]);
 
   const connect = async (id: string) => {
-    await f(`/connections/${id}/connect`, { method: "POST" });
-    refresh();
+    try {
+      await f(`/connections/${id}/connect`, { method: "POST" });
+      refresh();
+    } catch { setOffline(true); }
   };
   const disconnect = async (id: string) => {
-    await f(`/connections/${id}/disconnect`, { method: "POST" });
-    refresh();
+    try {
+      await f(`/connections/${id}/disconnect`, { method: "POST" });
+      refresh();
+    } catch { setOffline(true); }
   };
   const runAnalysis = async () => {
     setAnalyzing(true);
@@ -133,13 +137,17 @@ export default function Dashboard() {
     setAnalyzing(false);
   };
   const demoBlocked = async () => {
-    await f("/analyze/demo-blocked-write", { method: "POST" });
-    refresh();
+    try {
+      await f("/analyze/demo-blocked-write", { method: "POST" });
+      refresh();
+    } catch { setOffline(true); }
   };
   const reset = async () => {
-    await f("/reset", { method: "POST" });
-    setAnalysis(null);
-    refresh();
+    try {
+      await f("/reset", { method: "POST" });
+      setAnalysis(null);
+      refresh();
+    } catch { setOffline(true); }
   };
 
   const alerts = dash?.recent_alerts ?? [];
@@ -208,7 +216,9 @@ export default function Dashboard() {
                           : "text-zinc-600 bg-zinc-900 border border-zinc-800"
                       }`}
                     >
-                      {c.connected ? "READ-ONLY" : "OFFLINE"}
+                      {c.connected
+                        ? c.service_id === "slack" ? "ALERT-ONLY" : "READ-ONLY"
+                        : "OFFLINE"}
                     </span>
                   </div>
                   <p className="text-[10px] text-zinc-600 font-mono leading-relaxed mb-3">{meta.desc}</p>

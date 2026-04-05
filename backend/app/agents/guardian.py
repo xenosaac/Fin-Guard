@@ -119,13 +119,32 @@ class GuardianAgent:
         """
         self.status = "analyzing"
 
-        # Step 1: Read transactions
+        # Check connection state — only access services that are connected
+        from app.auth import is_connected
+
+        # Step 1: Read transactions (only if financial_api connected)
+        if not is_connected("financial_api"):
+            self._log_blocked("financial_api", "read_transactions",
+                              "Service not connected. Connect via Token Vault first.")
+            self.status = "idle"
+            return AnalysisResponse(
+                summary="Cannot analyze: Financial API not connected. "
+                "Connect it via Token Vault to enable transaction monitoring.",
+                alerts=[], transactions_scanned=0, anomalies_found=0,
+            )
+
         transactions, txn_audit = get_transactions(days=30)
         self._log_audit(txn_audit)
 
-        # Step 2: Read budget
-        budget, budget_audit = get_budget()
-        self._log_audit(budget_audit)
+        # Step 2: Read budget (only if google_sheets connected)
+        budget = None
+        budget_analysis = {"over_budget_categories": [], "projected_savings": 0, "savings_on_track": True}
+        if is_connected("google_sheets"):
+            budget, budget_audit = get_budget()
+            self._log_audit(budget_audit)
+        else:
+            self._log_blocked("google_sheets", "read_budget",
+                              "Google Sheets not connected. Budget analysis skipped.")
 
         # Step 3: Rule-based anomaly detection
         anomalies = detect_anomalies(
@@ -134,8 +153,9 @@ class GuardianAgent:
             single_txn_limit=single_txn_limit,
         )
 
-        # Step 4: Budget analysis
-        budget_analysis = analyze_budget(budget)
+        # Step 4: Budget analysis (only if budget data available)
+        if budget:
+            budget_analysis = analyze_budget(budget)
 
         # Step 4b: Over-budget alerts
         for cat_info in budget_analysis["over_budget_categories"]:
@@ -179,11 +199,18 @@ class GuardianAgent:
             user_prompt = _build_analysis_prompt(transactions, budget_analysis)
             ai_summary = await llm_analyze(SYSTEM_PROMPT, user_prompt)
 
-        # Step 6: Send notifications
+        # Step 6: Send notifications (only if slack connected)
         self.status = "alerting"
-        alerts, alert_audits = send_notification_batch(anomalies)
-        for a in alert_audits:
-            self._log_audit(a)
+        if is_connected("slack"):
+            alerts, alert_audits = send_notification_batch(anomalies)
+            for a in alert_audits:
+                self._log_audit(a)
+        else:
+            # Create alerts in-app only, no Slack
+            from app.tools.notifications import create_alert_from_anomaly
+            alerts = [create_alert_from_anomaly(txn) for txn in anomalies]
+            self._log_blocked("slack", "send_alert",
+                              "Slack not connected. Alerts created in-app only.")
 
         # Build summary
         if ai_summary:
