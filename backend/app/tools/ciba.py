@@ -175,6 +175,10 @@ class CIBAClient:
     def get_all(self) -> list[dict]:
         return [{"request_id": k, **v} for k, v in self._pending.items()]
 
+    def clear_all(self) -> None:
+        """Clear all pending requests."""
+        self._pending.clear()
+
 
 # Singleton
 ciba = CIBAClient()
