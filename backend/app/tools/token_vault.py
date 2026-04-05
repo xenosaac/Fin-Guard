@@ -92,7 +92,7 @@ class TokenVaultClient:
         )
 
     def exchange_token(
-        self, service_id: str, refresh_token: str | None = None
+        self, service_id: str, refresh_token: Optional[str] = None
     ) -> tuple[Optional[str], AuditEntry]:
         """Exchange Auth0 token for external service token (RFC 8693).
 
