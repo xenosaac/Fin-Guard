@@ -10,3 +10,5 @@ pydantic>=2.9.0
 pydantic-settings>=2.5.0
 python-dotenv>=1.0.0
 python-jose[cryptography]>=3.3.0
+starlette>=0.41.0
+itsdangerous>=2.2.0

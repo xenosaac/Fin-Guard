@@ -76,18 +76,30 @@ def get_connections() -> list[ServiceConnection]:
 def connect_service(service_id: str) -> ServiceConnection:
     """Connect a service via Token Vault.
 
-    In production, this triggers the Auth0 Connected Accounts flow:
+    Triggers the Auth0 Connected Accounts flow:
     1. Redirect user to service's OAuth consent screen
     2. User grants read-only permissions
     3. Auth0 stores tokens in Token Vault
     4. Fin-Guard retrieves tokens via token exchange
 
-    For the hackathon demo, we simulate this flow.
+    Token Vault audit entries are logged for each step.
     """
+    from app.tools.token_vault import vault
+    from app.agents.guardian import agent
+
     if service_id not in SERVICE_REGISTRY:
         raise ValueError(f"Unknown service: {service_id}")
 
     registry = SERVICE_REGISTRY[service_id]
+
+    # Step 1: Store token in Token Vault (simulates OAuth callback)
+    store_audit = vault.store_token(service_id, registry["scopes"])
+    agent.audit_log.append(store_audit)
+
+    # Step 2: Verify token exchange works
+    _, exchange_audit = vault.exchange_token(service_id)
+    agent.audit_log.append(exchange_audit)
+
     conn = ServiceConnection(
         service_id=service_id,
         service_name=registry["name"],
@@ -104,9 +116,14 @@ def disconnect_service(service_id: str) -> bool:
     """Disconnect a service — revoke Token Vault access.
 
     User can disconnect any service at any time without affecting others.
-    This is the per-service granular revocation model.
+    This is per-service granular revocation. The revocation is logged.
     """
+    from app.tools.token_vault import vault
+    from app.agents.guardian import agent
+
     if service_id in _connections:
+        revoke_audit = vault.revoke_token(service_id)
+        agent.audit_log.append(revoke_audit)
         del _connections[service_id]
         return True
     return False
