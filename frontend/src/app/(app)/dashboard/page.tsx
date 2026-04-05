@@ -606,65 +606,6 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* -- CIBA Overlay (only opens on explicit user click) --------------- */}
-      {cibaOpen && ciba && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0a0a0a] border border-amber-500/20 rounded-xl p-8 max-w-md w-full mx-4 space-y-5 fade-in">
-            {/* pulsing icon */}
-            <div className="flex justify-center">
-              <div className="relative">
-                <svg className="w-10 h-10 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <circle cx="12" cy="15" r="0.5" fill="currentColor" />
-                </svg>
-                <span className="absolute inset-0 animate-ping rounded-full bg-amber-400/20" />
-              </div>
-            </div>
-
-            <div className="text-center space-y-1">
-              <h3 className="text-[12px] font-bold text-amber-400 uppercase tracking-widest" style={{ fontFamily: "'Space Grotesk'" }}>
-                CIBA &mdash; Human Approval Required
-              </h3>
-              <p className="text-[9px] text-zinc-500 font-mono">The agent is requesting elevated permission.</p>
-            </div>
-
-            <div className="bg-[#111] p-3 rounded-xl space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[8px] text-zinc-600 uppercase tracking-widest font-mono w-14">Action</span>
-                <span className="text-[10px] text-zinc-300 font-mono">{ciba.action}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[8px] text-zinc-600 uppercase tracking-widest font-mono w-14">Reason</span>
-                <span className="text-[10px] text-zinc-300 font-mono">{ciba.reason}</span>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => respondCiba(true)}
-                className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest bg-[#00ffa3] text-[#050505] rounded-lg hover:brightness-110 hover:shadow-lg hover:shadow-[#00ffa3]/20 active:scale-[0.97] transition-all duration-150"
-                style={{ fontFamily: "'Space Grotesk'" }}
-              >
-                Approve
-              </button>
-              <button
-                onClick={() => respondCiba(false)}
-                className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white rounded-lg hover:brightness-110 hover:shadow-lg hover:shadow-red-500/20 active:scale-[0.97] transition-all duration-150"
-                style={{ fontFamily: "'Space Grotesk'" }}
-              >
-                Deny
-              </button>
-              <button
-                onClick={() => setCibaOpen(false)}
-                className="px-3 py-2.5 text-[10px] font-mono uppercase tracking-widest text-zinc-500 border border-zinc-700 rounded-lg hover:bg-zinc-800 hover:shadow-lg active:scale-[0.97] transition-all duration-150"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

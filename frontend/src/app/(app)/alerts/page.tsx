@@ -202,7 +202,7 @@ export default function AlertsPage() {
 
             return (
               <div
-                key={item.request_id}
+                key={`${item.request_id}-${item.status}`}
                 className={`group bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl px-5 py-3.5
                   flex items-center gap-4 transition-all duration-400
                   ${isFading ? "opacity-0 scale-[0.98] translate-x-4" : "opacity-100"}
