@@ -207,7 +207,7 @@ export default function DashboardPage() {
         setConnCount(d.connections?.filter((c: any) => c.connected).length || 0);
       }
     } catch {}
-  }, [onboarded, onboarding]);
+  }, [onboarded]);
 
   useEffect(() => {
     runOnboarding();
