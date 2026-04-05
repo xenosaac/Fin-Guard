@@ -55,18 +55,27 @@ class SecurityScorer:
 
     # ── Public API ──────────────────────────────────────────────────────────
 
-    def calculate(self) -> dict:
-        """Return the full security score breakdown.
+    def calculate_for_session(self, session) -> dict:
+        """Calculate score using per-session state."""
+        connections = session.get_connections()
+        audit_log = session.audit_log
+        return self._calculate(connections, audit_log)
 
-        Returns a dict with overall_score, grade, dimensions,
-        recent_events, and recommendations.
-        """
+    def calculate(self) -> dict:
+        """Fallback: calculate with global state."""
+        from app.auth import get_connections
+        connections = get_connections()
+        audit_log = self._get_audit_log()
+        return self._calculate(connections, audit_log)
+
+    def _calculate(self, connections, audit_log) -> dict:
+        """Return the full security score breakdown."""
         dims = [
-            self._score_token_vault(),
-            self._score_fga_enforcement(),
+            self._score_token_vault(connections),
+            self._score_fga_enforcement(audit_log),
             self._score_ciba(),
-            self._score_audit_completeness(),
-            self._score_zero_trust(),
+            self._score_audit_completeness(audit_log),
+            self._score_zero_trust(audit_log),
         ]
 
         overall = round(sum(d["score"] * d["_weight"] for d in dims))
@@ -80,8 +89,8 @@ class SecurityScorer:
             "overall_score": overall,
             "grade": _grade(overall),
             "dimensions": dims,
-            "recent_events": self._recent_events(),
-            "recommendations": self._recommendations(),
+            "recent_events": self._recent_events(audit_log),
+            "recommendations": self._recommendations(connections),
         }
 
     def get_trend(self) -> list[dict]:
@@ -112,8 +121,10 @@ class SecurityScorer:
 
     # ── Dimension scorers ───────────────────────────────────────────────────
 
-    def _score_token_vault(self) -> dict:
-        connections = get_connections()
+    def _score_token_vault(self, connections=None) -> dict:
+        if connections is None:
+            from app.auth import get_connections
+            connections = get_connections()
         connected = [c for c in connections if c.connected]
         n = len(connected)
 
@@ -137,7 +148,7 @@ class SecurityScorer:
             "_weight": 0.25,
         }
 
-    def _score_fga_enforcement(self) -> dict:
+    def _score_fga_enforcement(self, audit_log=None) -> dict:
         # Base: permission model completeness
         defined_perms = len(AGENT_PERMISSIONS)
         defined_blocks = len(BLOCKED_ACTIONS)
@@ -152,7 +163,8 @@ class SecurityScorer:
             base = 20
 
         # Bonus: recent successful blocks prove enforcement is active
-        audit_log = self._get_audit_log()
+        if audit_log is None:
+            audit_log = self._get_audit_log()
         recent_blocks = [
             e for e in audit_log
             if not e.success and "fga" in e.service.lower()
@@ -210,8 +222,9 @@ class SecurityScorer:
             "_weight": 0.20,
         }
 
-    def _score_audit_completeness(self) -> dict:
-        audit_log = self._get_audit_log()
+    def _score_audit_completeness(self, audit_log=None) -> dict:
+        if audit_log is None:
+            audit_log = self._get_audit_log()
         total_entries = len(audit_log)
 
         if total_entries == 0:
@@ -233,11 +246,12 @@ class SecurityScorer:
             "_weight": 0.15,
         }
 
-    def _score_zero_trust(self) -> dict:
+    def _score_zero_trust(self, audit_log=None) -> dict:
         # Fin-Guard is read-only by design — base is always 100
         score = 100
 
-        audit_log = self._get_audit_log()
+        if audit_log is None:
+            audit_log = self._get_audit_log()
         blocked_writes = [
             e for e in audit_log
             if not e.success and "blocked" in e.action.lower()
@@ -262,9 +276,10 @@ class SecurityScorer:
 
     # ── Recent events ───────────────────────────────────────────────────────
 
-    def _recent_events(self) -> list[dict]:
+    def _recent_events(self, audit_log=None) -> list[dict]:
         """Last 5 audit entries formatted with security impact."""
-        audit_log = self._get_audit_log()
+        if audit_log is None:
+            audit_log = self._get_audit_log()
         events: list[dict] = []
 
         for entry in audit_log[-5:]:
@@ -297,11 +312,13 @@ class SecurityScorer:
 
     # ── Recommendations ─────────────────────────────────────────────────────
 
-    def _recommendations(self) -> list[str]:
+    def _recommendations(self, connections=None) -> list[str]:
         recs: list[str] = []
 
         # Unconnected services
-        connections = get_connections()
+        if connections is None:
+            from app.auth import get_connections
+            connections = get_connections()
         for conn in connections:
             if not conn.connected:
                 feature = _SERVICE_FEATURES.get(conn.service_id, "additional features")
