@@ -309,7 +309,12 @@ async def _maybe_trigger_ciba(anomaly_results: str) -> Optional[str]:
     """If high-risk anomalies (>$1,000) were detected, trigger CIBA approval.
 
     Returns a CIBA status string to append to the response, or None.
+    Skips if there are already pending CIBA requests to avoid flooding.
     """
+    # Don't create more CIBA requests if there are already pending ones
+    if ciba.get_pending():
+        return None
+
     # Parse anomaly amounts from the result text
     high_risk_lines = []
     for line in anomaly_results.split("\n"):

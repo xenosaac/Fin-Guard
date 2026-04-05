@@ -186,6 +186,11 @@ function formatUSD(n: number) {
   });
 }
 
+function formatShortDate(dateStr: string) {
+  const d = new Date(dateStr + "T00:00:00");
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 const CATEGORY_COLORS: Record<string, string> = {
   groceries: "text-green-400 border-green-400/20 bg-green-400/5",
   transport: "text-blue-400 border-blue-400/20 bg-blue-400/5",
@@ -201,6 +206,23 @@ const CATEGORY_COLORS: Record<string, string> = {
   fees: "text-red-400 border-red-400/20 bg-red-400/5",
   crypto: "text-yellow-400 border-yellow-400/20 bg-yellow-400/5",
   unknown: "text-red-400 border-red-400/20 bg-red-400/5",
+};
+
+const CATEGORY_DOT_COLORS: Record<string, string> = {
+  groceries: "bg-green-400",
+  transport: "bg-blue-400",
+  subscriptions: "bg-purple-400",
+  shopping: "bg-amber-400",
+  "food & drink": "bg-orange-400",
+  health: "bg-pink-400",
+  utilities: "bg-cyan-400",
+  income: "bg-[#00ffa3]",
+  transfer: "bg-zinc-400",
+  dividends: "bg-[#00ffa3]",
+  investment: "bg-indigo-400",
+  fees: "bg-red-400",
+  crypto: "bg-yellow-400",
+  unknown: "bg-red-400",
 };
 
 /* ── Component ──────────────────────────────────────────────────────────────── */
@@ -323,7 +345,7 @@ export default function AccountDetailPage() {
                     {formatUSD(day.balance)}
                   </span>
                   <div
-                    className="w-full transition-all"
+                    className="w-full rounded-t-lg transition-all"
                     style={{
                       height: `${pct * 100}%`,
                       background:
@@ -340,7 +362,7 @@ export default function AccountDetailPage() {
           </div>
         </div>
 
-        {/* ── Recent Transactions Table ────────────────────────────── */}
+        {/* ── Recent Transactions (Chase-style rows) ──────────────── */}
         <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl overflow-hidden">
           <div className="px-5 py-4 border-b border-[#1a1a1a] flex items-center justify-between">
             <h2
@@ -354,57 +376,69 @@ export default function AccountDetailPage() {
             </span>
           </div>
 
-          {/* Table header */}
-          <div className="grid grid-cols-[100px_1fr_120px_110px] px-5 py-2.5 border-b border-[#1a1a1a] text-[9px] font-mono text-zinc-600 uppercase tracking-[0.15em]">
-            <span>Date</span>
-            <span>Description</span>
-            <span>Category</span>
-            <span className="text-right">Amount</span>
-          </div>
-
           {/* Transaction rows */}
-          {transactions.map((txn, i) => {
-            const catStyle =
-              CATEGORY_COLORS[txn.category] ||
-              "text-zinc-400 border-zinc-400/20 bg-zinc-400/5";
-            return (
-              <div
-                key={i}
-                className={`grid grid-cols-[100px_1fr_120px_110px] px-5 py-3 border-b border-[#111] hover:bg-[#0d0d0d] transition items-center ${
-                  txn.anomaly
-                    ? "border-l-2 border-l-red-500/60 bg-red-500/[0.02]"
-                    : ""
-                }`}
-              >
-                <span className="text-[11px] font-mono text-zinc-500">
-                  {txn.date}
-                </span>
-                <span className="text-[11px] text-zinc-300 truncate pr-4">
-                  {txn.description}
-                  {txn.anomaly && (
-                    <span className="ml-2 text-[8px] font-bold tracking-[0.15em] text-red-400 uppercase">
-                      Anomaly
-                    </span>
-                  )}
-                </span>
-                <span>
-                  <span
-                    className={`inline-block px-2 py-0.5 text-[8px] font-bold tracking-[0.1em] uppercase border rounded-full ${catStyle}`}
-                  >
-                    {txn.category}
-                  </span>
-                </span>
-                <span
-                  className={`text-[12px] font-mono text-right font-medium ${
-                    txn.amount >= 0 ? "text-[#00ffa3]" : "text-red-400"
+          <div className="divide-y divide-[#141414]">
+            {transactions.map((txn, i) => {
+              const catStyle =
+                CATEGORY_COLORS[txn.category] ||
+                "text-zinc-400 border-zinc-400/20 bg-zinc-400/5";
+              const dotColor =
+                CATEGORY_DOT_COLORS[txn.category] || "bg-zinc-400";
+
+              return (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between px-5 py-3.5 hover:bg-[#0f0f0f] transition-colors duration-150 ${
+                    txn.anomaly
+                      ? "border-l-2 border-l-red-500/60 bg-red-500/[0.02]"
+                      : ""
                   }`}
                 >
-                  {txn.amount >= 0 ? "+" : "-"}
-                  {formatUSD(txn.amount)}
-                </span>
-              </div>
-            );
-          })}
+                  {/* Left side: dot + merchant + meta */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-[13px] text-zinc-200 truncate leading-tight">
+                        {txn.description}
+                      </p>
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <span className="text-[11px] text-zinc-600 font-mono">
+                          {formatShortDate(txn.date)}
+                        </span>
+                        {txn.anomaly && (
+                          <>
+                            <span className="text-zinc-700">&#xb7;</span>
+                            <span className="text-[8px] font-bold tracking-[0.12em] text-red-400 uppercase bg-red-400/10 border border-red-400/20 px-1.5 py-0.5 rounded-full">
+                              Anomaly
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right side: amount + category pill */}
+                  <div className="flex flex-col items-end shrink-0 ml-4">
+                    <span
+                      className={`text-[13px] font-mono font-medium leading-tight ${
+                        txn.amount >= 0 ? "text-[#00ffa3]" : "text-zinc-200"
+                      }`}
+                    >
+                      {txn.amount >= 0 ? "+" : "-"}
+                      {formatUSD(txn.amount)}
+                    </span>
+                    <span
+                      className={`inline-block mt-1 px-2 py-0.5 text-[8px] font-bold tracking-[0.08em] uppercase border rounded-full ${catStyle}`}
+                    >
+                      {txn.category}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         {/* ── FGA Security Note ────────────────────────────────────── */}

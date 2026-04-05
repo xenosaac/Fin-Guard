@@ -64,3 +64,9 @@
   to { opacity: 1; transform: translateY(0); }
 }
 .fade-in { animation: fade-slide-in 0.3s ease-out; }
+
+/* Red flash for blocked write attempts */
+@keyframes flash-red {
+  0% { background-color: rgba(239, 68, 68, 0.9); box-shadow: 0 0 30px rgba(239, 68, 68, 0.5); }
+  100% { background-color: rgba(239, 68, 68, 0.6); box-shadow: 0 0 15px rgba(239, 68, 68, 0.3); }
+}

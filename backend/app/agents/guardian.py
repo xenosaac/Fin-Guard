@@ -206,8 +206,8 @@ class GuardianAgent:
             user_prompt = _build_analysis_prompt(transactions, budget_analysis)
             ai_summary = await llm_analyze(SYSTEM_PROMPT, user_prompt)
 
-        # Step 5b: CIBA for high-risk anomalies
-        high_risk = [a for a in anomalies if a.amount > 1000]
+        # Step 5b: CIBA for high-risk anomalies (top 2 only to avoid flooding)
+        high_risk = sorted([a for a in anomalies if a.amount > 1000], key=lambda x: -x.amount)[:2]
         if high_risk:
             self.status = "awaiting_approval"
             for txn in high_risk:
