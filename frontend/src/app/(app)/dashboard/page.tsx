@@ -44,7 +44,6 @@ export default function DashboardPage() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [onboarded, setOnboarded] = useState(false);
-  const [onboarding, setOnboarding] = useState(false);
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
   const [auditOpen, setAuditOpen] = useState(false);
   const [connCount, setConnCount] = useState(0);
@@ -54,6 +53,7 @@ export default function DashboardPage() {
 
   const chatRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const onboardingRef = useRef(false); // sync guard — prevents double-fire in StrictMode
 
   const scrollChat = () => {
     setTimeout(() => chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" }), 100);
@@ -69,8 +69,8 @@ export default function DashboardPage() {
   /* ── Auto-onboard on first visit ──────────────────────────────── */
 
   const runOnboarding = useCallback(async () => {
-    if (onboarded || onboarding) return;
-    setOnboarding(true);
+    if (onboarded || onboardingRef.current) return;
+    onboardingRef.current = true;
 
     // Check if session already has chat history (returning user)
     try {
@@ -88,7 +88,6 @@ export default function DashboardPage() {
           _msgId = restored.length;
           setMessages(restored);
           setOnboarded(true);
-          setOnboarding(false);
           // Fetch dashboard state
           try {
             const dRes = await fetch("/api/dashboard");
@@ -198,7 +197,6 @@ export default function DashboardPage() {
     }
 
     setOnboarded(true);
-    setOnboarding(false);
 
     // Fetch audit log
     try {
@@ -447,7 +445,7 @@ export default function DashboardPage() {
                   await fetch("/api/chat/clear", { method: "POST" });
                   setMessages([]);
                   setOnboarded(false);
-                  setOnboarding(false);
+                  onboardingRef.current = false;
                   _msgId = 0;
                 }} className="text-[9px] text-zinc-700 font-mono hover:text-zinc-400 transition">
                   Clear chat
