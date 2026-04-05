@@ -26,3 +26,9 @@ dist/
 # Build
 build/
 *.log
+
+# Strategy / internal
+STRATEGY.md
+DEMO_SCRIPT.md
+SUBMISSION_CHECKLIST.md
+DESIGN_BRIEF.md
