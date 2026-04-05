@@ -44,9 +44,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             const active = pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link key={item.href} href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 text-[11px] font-medium transition-all ${
+                className={`flex items-center gap-3 px-3 py-2.5 text-[11px] font-medium rounded-xl transition-all ${
                   active
-                    ? "text-[#00ffa3] bg-[#00ffa3]/5 border-l-2 border-[#00ffa3] -ml-[2px]"
+                    ? "text-[#00ffa3] bg-[#00ffa3]/10"
                     : "text-zinc-500 hover:text-zinc-300 hover:bg-[#0f0f0f]"
                 }`}>
                 <span className={active ? "text-[#00ffa3]" : "text-zinc-600"}>{ICONS[item.icon]}</span>

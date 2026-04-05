@@ -6,17 +6,17 @@ import { useCallback, useEffect, useState } from "react";
 /* ── Types ───────────────────────────────────────────────────────────── */
 
 interface Connection {
-  id: string;
-  name: string;
+  service_id: string;
+  service_name: string;
   description: string;
-  scope: string;
+  scopes: string[];
   connected: boolean;
 }
 
 const DEFAULT_CONNECTIONS: Connection[] = [
-  { id: "financial_api", name: "Financial API", description: "Read-only access to bank accounts and transactions", scope: "accounts:read transactions:read", connected: true },
-  { id: "google_sheets", name: "Google Sheets", description: "Export budget reports to Google Sheets", scope: "spreadsheets:write", connected: false },
-  { id: "slack", name: "Slack", description: "Send alerts and summaries to Slack channels", scope: "chat:write incoming-webhook", connected: true },
+  { service_id: "financial_api", service_name: "Financial API", description: "Read-only access to bank accounts and transactions", scopes: ["accounts:read", "transactions:read"], connected: true },
+  { service_id: "google_sheets", service_name: "Google Sheets", description: "Export budget reports to Google Sheets", scopes: ["spreadsheets:write"], connected: false },
+  { service_id: "slack", service_name: "Slack", description: "Send alerts and summaries to Slack channels", scopes: ["chat:write", "incoming-webhook"], connected: true },
 ];
 
 /* ── Reusable Components ─────────────────────────────────────────────── */
@@ -37,7 +37,7 @@ function Badge({ children, variant = "default" }: { children: React.ReactNode; v
     amber: "text-amber-400/70 border-amber-400/20 bg-amber-400/5",
   };
   return (
-    <span className={`px-2 py-0.5 text-[9px] font-bold tracking-[0.15em] uppercase font-mono border ${colors[variant]}`}>
+    <span className={`px-2 py-0.5 text-[9px] font-bold tracking-[0.15em] uppercase font-mono border rounded-full ${colors[variant]}`}>
       {children}
     </span>
   );
@@ -51,9 +51,9 @@ function Toggle({ checked, onChange, disabled }: { checked: boolean; onChange?: 
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
-      className={`relative inline-flex h-5 w-9 items-center transition-colors ${checked ? "bg-[#00ffa3]/20 border-[#00ffa3]/40" : "bg-[#1a1a1a] border-zinc-700"} border ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${checked ? "bg-[#00ffa3]/20 border-[#00ffa3]/40" : "bg-[#1a1a1a] border-zinc-700"} border ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
     >
-      <span className={`inline-block h-3 w-3 transform transition-transform ${checked ? "translate-x-[18px] bg-[#00ffa3]" : "translate-x-1 bg-zinc-500"}`} />
+      <span className={`inline-block h-3 w-3 rounded-full transform transition-transform ${checked ? "translate-x-[18px] bg-[#00ffa3]" : "translate-x-1 bg-zinc-500"}`} />
     </button>
   );
 }
@@ -81,22 +81,32 @@ export default function SettingsPage() {
   useEffect(() => {
     fetch("/api/connections")
       .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data)) setConnections(data); })
+      .then((data) => {
+        if (Array.isArray(data)) {
+          setConnections(data.map((item: Record<string, unknown>) => ({
+            service_id: String(item.service_id ?? item.id ?? ""),
+            service_name: String(item.service_name ?? item.name ?? ""),
+            description: String(item.description ?? ""),
+            scopes: Array.isArray(item.scopes) ? (item.scopes as string[]) : (typeof item.scope === "string" ? item.scope.split(" ") : []),
+            connected: !!item.connected,
+          })));
+        }
+      })
       .catch(() => {});
   }, []);
 
-  const toggleConnection = useCallback(async (id: string, connect: boolean) => {
-    setLoading(id);
+  const toggleConnection = useCallback(async (serviceId: string, connect: boolean) => {
+    setLoading(serviceId);
     try {
-      const res = await fetch(`/api/connections/${id}/${connect ? "connect" : "disconnect"}`, { method: "POST" });
+      const res = await fetch(`/api/connections/${serviceId}/${connect ? "connect" : "disconnect"}`, { method: "POST" });
       if (res.ok) {
-        setConnections((prev) => prev.map((c) => (c.id === id ? { ...c, connected: connect } : c)));
+        setConnections((prev) => prev.map((c) => (c.service_id === serviceId ? { ...c, connected: connect } : c)));
       }
     } catch { /* silent */ }
     setLoading(null);
   }, []);
 
-  const slackConnected = connections.find((c) => c.id === "slack")?.connected ?? false;
+  const slackConnected = connections.find((c) => c.service_id === "slack")?.connected ?? false;
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -115,25 +125,25 @@ export default function SettingsPage() {
           <SectionTitle>Token Vault Connections</SectionTitle>
           <div className="space-y-3">
             {connections.map((conn) => (
-              <div key={conn.id} className="p-4 bg-[#0a0a0a] border border-[#1a1a1a] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div key={conn.service_id} className="p-4 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[12px] font-semibold text-zinc-200" style={{ fontFamily: "'Space Grotesk'" }}>{conn.name}</span>
+                    <span className="text-[12px] font-semibold text-zinc-200" style={{ fontFamily: "'Space Grotesk'" }}>{conn.service_name}</span>
                     {conn.connected ? <Badge variant="green">Connected</Badge> : <Badge variant="red">Disconnected</Badge>}
                   </div>
                   <p className="text-[10px] text-zinc-500">{conn.description}</p>
-                  <span className="text-[9px] font-mono text-zinc-600 mt-1 block">scope: {conn.scope}</span>
+                  <span className="text-[9px] font-mono text-zinc-600 mt-1 block">scope: {conn.scopes.join(" ")}</span>
                 </div>
                 <button
-                  onClick={() => toggleConnection(conn.id, !conn.connected)}
-                  disabled={loading === conn.id}
-                  className={`shrink-0 px-4 py-1.5 text-[10px] font-bold tracking-[0.1em] uppercase font-mono border transition-colors ${
+                  onClick={() => toggleConnection(conn.service_id, !conn.connected)}
+                  disabled={loading === conn.service_id}
+                  className={`shrink-0 px-4 py-1.5 text-[10px] font-bold tracking-[0.1em] uppercase font-mono border rounded-xl active:scale-[0.97] transition-all duration-150 ${
                     conn.connected
                       ? "text-red-400/70 border-red-400/20 hover:bg-red-400/10"
                       : "text-[#00ffa3] border-[#00ffa3]/20 hover:bg-[#00ffa3]/10"
-                  } ${loading === conn.id ? "opacity-50 cursor-wait" : ""}`}
+                  } ${loading === conn.service_id ? "opacity-50 cursor-wait" : ""}`}
                 >
-                  {loading === conn.id ? "..." : conn.connected ? "Disconnect" : "Connect"}
+                  {loading === conn.service_id ? "..." : conn.connected ? "Disconnect" : "Connect"}
                 </button>
               </div>
             ))}
@@ -143,7 +153,7 @@ export default function SettingsPage() {
         {/* ── 2. Notification Preferences ─────────────────────────────── */}
         <section>
           <SectionTitle>Notification Preferences</SectionTitle>
-          <div className="space-y-0 bg-[#0a0a0a] border border-[#1a1a1a] divide-y divide-[#1a1a1a]">
+          <div className="space-y-0 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl divide-y divide-[#1a1a1a]">
             <NotifRow label="Email Alerts" sub="Receive alerts via email" checked={emailAlerts} onChange={setEmailAlerts} />
             <NotifRow label="Slack Notifications" sub={slackConnected ? "Send alerts to connected Slack workspace" : "Requires Slack connection"} checked={slackNotifs && slackConnected} onChange={setSlackNotifs} disabled={!slackConnected} />
             <div className="flex items-center justify-between px-4 py-3">
@@ -164,14 +174,14 @@ export default function SettingsPage() {
         {/* ── 3. AI Agent Configuration ───────────────────────────────── */}
         <section>
           <SectionTitle>AI Agent Configuration</SectionTitle>
-          <div className="bg-[#0a0a0a] border border-[#1a1a1a] divide-y divide-[#1a1a1a]">
+          <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl divide-y divide-[#1a1a1a]">
             {/* Analysis frequency */}
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-[11px] text-zinc-200">Analysis Frequency</span>
               <select
                 value={analysisFreq}
                 onChange={(e) => setAnalysisFreq(e.target.value)}
-                className="bg-[#111] border border-[#1a1a1a] text-[10px] text-zinc-300 font-mono px-2 py-1 outline-none focus:border-[#00ffa3]/40"
+                className="bg-[#111] border border-[#1a1a1a] rounded-lg text-[10px] text-zinc-300 font-mono px-2 py-1 outline-none focus:border-[#00ffa3]/40"
               >
                 <option value="daily">Daily</option>
                 <option value="weekly">Weekly</option>
@@ -210,7 +220,7 @@ export default function SettingsPage() {
         {/* ── 4. Security Settings ────────────────────────────────────── */}
         <section>
           <SectionTitle>Security Settings</SectionTitle>
-          <div className="bg-[#0a0a0a] border border-[#1a1a1a] divide-y divide-[#1a1a1a]">
+          <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl divide-y divide-[#1a1a1a]">
             <div className="px-4 py-3">
               <span className="text-[11px] text-zinc-200 block mb-2">FGA Authorization Model</span>
               <div className="flex flex-col gap-1">
@@ -227,7 +237,7 @@ export default function SettingsPage() {
               <select
                 value={sessionTimeout}
                 onChange={(e) => setSessionTimeout(e.target.value)}
-                className="bg-[#111] border border-[#1a1a1a] text-[10px] text-zinc-300 font-mono px-2 py-1 outline-none focus:border-[#00ffa3]/40"
+                className="bg-[#111] border border-[#1a1a1a] rounded-lg text-[10px] text-zinc-300 font-mono px-2 py-1 outline-none focus:border-[#00ffa3]/40"
               >
                 <option value="15">15 minutes</option>
                 <option value="30">30 minutes</option>
@@ -240,7 +250,7 @@ export default function SettingsPage() {
         {/* ── 5. Data & Privacy ───────────────────────────────────────── */}
         <section>
           <SectionTitle>Data & Privacy</SectionTitle>
-          <div className="bg-[#0a0a0a] border border-[#1a1a1a] divide-y divide-[#1a1a1a]">
+          <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl divide-y divide-[#1a1a1a]">
             <div className="px-4 py-3 flex flex-wrap gap-2">
               <ActionButton label="Export Audit Trail" onClick={() => { window.location.href = "/api/audit/export"; }} />
               <ActionButton label="Clear Chat History" variant="amber" onClick={async () => { await fetch("/api/chat/clear", { method: "POST" }); }} />
@@ -256,7 +266,7 @@ export default function SettingsPage() {
         {/* ── 6. About ────────────────────────────────────────────────── */}
         <section className="pb-10">
           <SectionTitle>About</SectionTitle>
-          <div className="bg-[#0a0a0a] border border-[#1a1a1a] p-4 space-y-3">
+          <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl p-4 space-y-3">
             <div className="flex items-center gap-3">
               <span className="text-[12px] font-bold text-white" style={{ fontFamily: "'Space Grotesk'" }}>Fin-Guard</span>
               <Badge variant="green">v1.0.0</Badge>
@@ -264,12 +274,12 @@ export default function SettingsPage() {
             <p className="text-[10px] text-zinc-500">Built for Auth0 &ldquo;Authorized to Act&rdquo; Hackathon</p>
             <div className="flex flex-wrap gap-1.5">
               {["Token Vault", "FGA", "CIBA"].map((f) => (
-                <span key={f} className="px-2 py-0.5 text-[8px] font-bold tracking-[0.15em] text-[#00ffa3] border border-[#00ffa3]/20 bg-[#00ffa3]/5 uppercase font-mono">{f}</span>
+                <span key={f} className="px-2 py-0.5 text-[8px] font-bold tracking-[0.15em] text-[#00ffa3] border border-[#00ffa3]/20 bg-[#00ffa3]/5 uppercase font-mono rounded-full">{f}</span>
               ))}
             </div>
             <div className="flex flex-wrap gap-1.5">
               {["Next.js", "FastAPI", "Auth0"].map((t) => (
-                <span key={t} className="px-2 py-0.5 text-[8px] font-bold tracking-[0.1em] text-zinc-400 border border-zinc-700 bg-zinc-800/50 uppercase font-mono">{t}</span>
+                <span key={t} className="px-2 py-0.5 text-[8px] font-bold tracking-[0.1em] text-zinc-400 border border-zinc-700 bg-zinc-800/50 uppercase font-mono rounded-full">{t}</span>
               ))}
             </div>
           </div>
@@ -301,7 +311,7 @@ function ActionButton({ label, variant = "default", onClick }: { label: string; 
     red: "text-red-400/70 border-red-400/20 hover:bg-red-400/10",
   };
   return (
-    <button onClick={onClick} className={`px-3 py-1.5 text-[10px] font-bold tracking-[0.1em] uppercase font-mono border transition-colors ${colors[variant]}`}>
+    <button onClick={onClick} className={`px-3 py-1.5 text-[10px] font-bold tracking-[0.1em] uppercase font-mono border rounded-xl active:scale-[0.97] transition-all duration-150 ${colors[variant]}`}>
       {label}
     </button>
   );

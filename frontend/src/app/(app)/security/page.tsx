@@ -308,7 +308,7 @@ export default function SecurityPage() {
       {/* CIBA Overlay */}
       {cibaRequests.length > 0 && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="w-full max-w-md p-6 bg-[#0a0a0a] border border-[#f59e0b]/40" style={{ boxShadow: "0 0 60px rgba(245,158,11,0.15)" }}>
+          <div className="w-full max-w-md p-6 bg-[#0a0a0a] border border-[#f59e0b]/40 rounded-2xl" style={{ boxShadow: "0 0 60px rgba(245,158,11,0.15)" }}>
             <div className="flex items-center gap-2 mb-4">
               <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] animate-pulse" />
               <span className="text-[11px] font-bold tracking-[0.2em] text-[#f59e0b] uppercase" style={{ fontFamily: "'Space Grotesk'" }}>
@@ -316,17 +316,17 @@ export default function SecurityPage() {
               </span>
             </div>
             {cibaRequests.map((req) => (
-              <div key={req.request_id} className="mb-4 p-4 border border-[#1a1a1a] bg-[#080808]">
+              <div key={req.request_id} className="mb-4 p-4 border border-[#1a1a1a] bg-[#080808] rounded-xl">
                 <p className="text-[10px] font-mono text-zinc-400 mb-1">Action: <span className="text-white">{req.action}</span></p>
                 <p className="text-[10px] font-mono text-zinc-400 mb-1">Reason: <span className="text-zinc-300">{req.reason}</span></p>
                 <p className="text-[10px] font-mono text-zinc-400 mb-3">Risk: <span className="text-[#ef4444] font-bold uppercase">{req.risk_level}</span></p>
                 <div className="flex gap-2">
                   <button onClick={() => handleCIBA(req.request_id, "approve")}
-                    className="flex-1 py-2 text-[10px] font-bold tracking-[0.15em] uppercase bg-[#00ffa3]/10 text-[#00ffa3] border border-[#00ffa3]/30 hover:bg-[#00ffa3]/20 transition">
+                    className="flex-1 py-2 text-[10px] font-bold tracking-[0.15em] uppercase bg-[#00ffa3]/10 text-[#00ffa3] border border-[#00ffa3]/30 rounded-xl hover:bg-[#00ffa3]/20 active:scale-[0.97] transition-all duration-150">
                     Approve
                   </button>
                   <button onClick={() => handleCIBA(req.request_id, "deny")}
-                    className="flex-1 py-2 text-[10px] font-bold tracking-[0.15em] uppercase bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/30 hover:bg-[#ef4444]/20 transition">
+                    className="flex-1 py-2 text-[10px] font-bold tracking-[0.15em] uppercase bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/30 rounded-xl hover:bg-[#ef4444]/20 active:scale-[0.97] transition-all duration-150">
                     Deny
                   </button>
                 </div>
@@ -362,7 +362,7 @@ export default function SecurityPage() {
           <div className="flex gap-1 mt-4">
             {TAB_ITEMS.map((t) => (
               <button key={t.key} onClick={() => setTab(t.key)}
-                className={`px-4 py-2 text-[10px] font-bold tracking-[0.12em] uppercase transition ${
+                className={`px-4 py-2 text-[10px] font-bold tracking-[0.12em] uppercase rounded-xl active:scale-[0.97] transition-all duration-150 ${
                   tab === t.key
                     ? "text-[#00ffa3] bg-[#00ffa3]/8 border border-[#00ffa3]/30"
                     : "text-zinc-500 border border-transparent hover:text-zinc-300 hover:border-[#1a1a1a]"
@@ -392,12 +392,12 @@ export default function SecurityPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {scenarios.map((s) => (
                       <button key={s.id} onClick={() => selectScenario(s.id)}
-                        className="text-left p-4 bg-[#080808] border border-[#1a1a1a] hover:border-[#00ffa3]/30 transition group">
+                        className="text-left p-4 bg-[#080808] border border-[#1a1a1a] rounded-2xl hover:border-[#00ffa3]/30 active:scale-[0.97] transition-all duration-150 group">
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="text-[11px] font-bold text-zinc-200 group-hover:text-[#00ffa3] transition" style={{ fontFamily: "'Space Grotesk'" }}>
                             {s.title}
                           </h3>
-                          <span className={`px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] border ${DIFFICULTY_COLORS[s.difficulty]}`}>
+                          <span className={`px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] border rounded-full ${DIFFICULTY_COLORS[s.difficulty]}`}>
                             {s.difficulty}
                           </span>
                         </div>
@@ -405,7 +405,7 @@ export default function SecurityPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex flex-wrap gap-1">
                             {s.auth0_features.map((f) => (
-                              <span key={f} className="px-1.5 py-0.5 text-[8px] font-mono text-[#00ffa3]/70 bg-[#00ffa3]/5 border border-[#00ffa3]/15">
+                              <span key={f} className="px-1.5 py-0.5 text-[8px] font-mono text-[#00ffa3]/70 bg-[#00ffa3]/5 border border-[#00ffa3]/15 rounded-full">
                                 {f}
                               </span>
                             ))}
@@ -429,14 +429,14 @@ export default function SecurityPage() {
                     <div className="mb-5">
                       <div className="flex items-center gap-3 mb-2">
                         <h2 className="text-[16px] font-bold text-white" style={{ fontFamily: "'Space Grotesk'" }}>{meta.title}</h2>
-                        <span className={`px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] border ${DIFFICULTY_COLORS[meta.difficulty]}`}>
+                        <span className={`px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] border rounded-full ${DIFFICULTY_COLORS[meta.difficulty]}`}>
                           {meta.difficulty}
                         </span>
                       </div>
                       <p className="text-[10px] font-mono text-zinc-500 mb-3">{meta.description}</p>
                       <div className="flex flex-wrap gap-1 mb-4">
                         {meta.auth0_features.map((f) => (
-                          <span key={f} className="px-2 py-0.5 text-[9px] font-mono text-[#00ffa3]/80 bg-[#00ffa3]/5 border border-[#00ffa3]/20">
+                          <span key={f} className="px-2 py-0.5 text-[9px] font-mono text-[#00ffa3]/80 bg-[#00ffa3]/5 border border-[#00ffa3]/20 rounded-full">
                             {f}
                           </span>
                         ))}
@@ -447,7 +447,7 @@ export default function SecurityPage() {
                   {/* Execute Button */}
                   {stepResults.length === 0 && !running && (
                     <button onClick={runScenario}
-                      className="px-6 py-3 text-[11px] font-bold tracking-[0.2em] uppercase bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/40 hover:bg-[#ef4444]/20 transition mb-6"
+                      className="px-6 py-3 text-[11px] font-bold tracking-[0.2em] uppercase bg-[#ef4444]/10 text-[#ef4444] border border-[#ef4444]/40 rounded-xl hover:bg-[#ef4444]/20 active:scale-[0.97] transition-all duration-150 mb-6"
                       style={{ boxShadow: "0 0 30px rgba(239,68,68,0.1)" }}>
                       Execute Attack Scenario
                     </button>
@@ -468,7 +468,7 @@ export default function SecurityPage() {
                       const isEscalated = r.outcome === "escalated";
                       return (
                         <div key={i}
-                          className={`p-4 border fade-in ${
+                          className={`p-4 border rounded-2xl fade-in ${
                             isBlocked ? "border-[#ef4444]/20 blocked-dramatic" :
                             isEscalated ? "border-[#f59e0b]/20 bg-[#f59e0b]/3" :
                             "border-[#00ffa3]/20 bg-[#080808]"
@@ -476,15 +476,15 @@ export default function SecurityPage() {
                           <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                               <span className="text-[10px] font-bold text-zinc-500 font-mono">STEP {r.step.step_number}</span>
-                              <span className={`px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] border ${badge.cls}`}>
+                              <span className={`px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] border rounded-full ${badge.cls}`}>
                                 {badge.label}
                               </span>
-                              <span className="px-1.5 py-0.5 text-[8px] font-mono text-zinc-500 bg-[#0a0a0a] border border-[#1a1a1a]">
+                              <span className="px-1.5 py-0.5 text-[8px] font-mono text-zinc-500 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg">
                                 {r.step.security_layer}
                               </span>
                             </div>
                             {r.ciba_triggered && (
-                              <span className="px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/30 animate-pulse">
+                              <span className="px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/30 rounded-full animate-pulse">
                                 CIBA TRIGGERED
                               </span>
                             )}
@@ -493,7 +493,7 @@ export default function SecurityPage() {
                             {r.step.title}
                           </h4>
                           <p className="text-[9px] font-mono text-zinc-500 mb-2">{r.step.description}</p>
-                          <div className="p-2 bg-[#050505] border border-[#1a1a1a] mb-2">
+                          <div className="p-2 bg-[#050505] border border-[#1a1a1a] rounded-lg mb-2">
                             <code className="text-[9px] font-mono text-zinc-400 break-all">
                               <span className="text-zinc-600">$</span> {r.step.attack_action}
                             </code>
@@ -519,7 +519,7 @@ export default function SecurityPage() {
 
                   {/* Completion Summary */}
                   {scenarioDone && (
-                    <div className="mt-6 p-4 border border-[#1a1a1a] bg-[#080808] fade-in">
+                    <div className="mt-6 p-4 border border-[#1a1a1a] bg-[#080808] rounded-2xl fade-in">
                       <h4 className="text-[11px] font-bold text-white mb-3 uppercase tracking-[0.15em]" style={{ fontFamily: "'Space Grotesk'" }}>
                         Scenario Complete
                       </h4>
@@ -555,7 +555,7 @@ export default function SecurityPage() {
                   Security Posture Score
                 </h2>
                 <button onClick={loadScore} disabled={scoreLoading}
-                  className="px-3 py-1.5 text-[9px] font-bold tracking-[0.15em] uppercase text-zinc-400 border border-[#1a1a1a] hover:text-[#00ffa3] hover:border-[#00ffa3]/30 transition disabled:opacity-50">
+                  className="px-3 py-1.5 text-[9px] font-bold tracking-[0.15em] uppercase text-zinc-400 border border-[#1a1a1a] rounded-lg hover:text-[#00ffa3] hover:border-[#00ffa3]/30 active:scale-[0.97] transition-all duration-150 disabled:opacity-50">
                   {scoreLoading ? "Loading..." : "Refresh"}
                 </button>
               </div>
@@ -563,7 +563,7 @@ export default function SecurityPage() {
               {score && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Gauge + Grade */}
-                  <div className="lg:col-span-1 flex flex-col items-center justify-center p-6 bg-[#080808] border border-[#1a1a1a]">
+                  <div className="lg:col-span-1 flex flex-col items-center justify-center p-6 bg-[#080808] border border-[#1a1a1a] rounded-2xl">
                     <svg width="200" height="200" viewBox="0 0 200 200" className="mb-3">
                       <circle cx="100" cy="100" r={gaugeRadius} fill="none" stroke="#1a1a1a" strokeWidth="8" />
                       <circle cx="100" cy="100" r={gaugeRadius} fill="none"
@@ -590,7 +590,7 @@ export default function SecurityPage() {
                   <div className="lg:col-span-2 space-y-4">
                     {/* 7-day Trend */}
                     {trend.length > 0 && (
-                      <div className="p-4 bg-[#080808] border border-[#1a1a1a]">
+                      <div className="p-4 bg-[#080808] border border-[#1a1a1a] rounded-2xl">
                         <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.15em] mb-3" style={{ fontFamily: "'Space Grotesk'" }}>
                           7-Day Trend
                         </h3>
@@ -611,13 +611,13 @@ export default function SecurityPage() {
                     {/* Dimension Cards */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {score.dimensions.map((d) => (
-                        <div key={d.name} className="p-3 bg-[#080808] border border-[#1a1a1a]">
+                        <div key={d.name} className="p-3 bg-[#080808] border border-[#1a1a1a] rounded-2xl">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-[10px] font-bold text-zinc-300" style={{ fontFamily: "'Space Grotesk'" }}>{d.name}</span>
                             <span className="text-[10px] font-mono text-[#00ffa3]">{d.score}/{d.max}</span>
                           </div>
-                          <div className="w-full h-1.5 bg-[#1a1a1a] mb-2">
-                            <div className="h-full transition-all duration-700"
+                          <div className="w-full h-1.5 bg-[#1a1a1a] rounded-full mb-2">
+                            <div className="h-full rounded-full transition-all duration-700"
                               style={{ width: `${(d.score / d.max) * 100}%`, backgroundColor: d.score >= 80 ? "#00ffa3" : d.score >= 60 ? "#f59e0b" : "#ef4444" }} />
                           </div>
                           <p className="text-[8px] font-mono text-zinc-600 leading-relaxed">{d.detail}</p>
@@ -632,7 +632,7 @@ export default function SecurityPage() {
               {score && (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
                   {/* Recent Events */}
-                  <div className="p-4 bg-[#080808] border border-[#1a1a1a]">
+                  <div className="p-4 bg-[#080808] border border-[#1a1a1a] rounded-2xl">
                     <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.15em] mb-3" style={{ fontFamily: "'Space Grotesk'" }}>
                       Recent Events
                     </h3>
@@ -660,7 +660,7 @@ export default function SecurityPage() {
                   </div>
 
                   {/* Recommendations */}
-                  <div className="p-4 bg-[#080808] border border-[#1a1a1a]">
+                  <div className="p-4 bg-[#080808] border border-[#1a1a1a] rounded-2xl">
                     <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.15em] mb-3" style={{ fontFamily: "'Space Grotesk'" }}>
                       Recommendations
                     </h3>
@@ -694,7 +694,7 @@ export default function SecurityPage() {
               </div>
 
               {/* Permission Matrix */}
-              <div className="bg-[#080808] border border-[#1a1a1a] mb-4 overflow-hidden">
+              <div className="bg-[#080808] border border-[#1a1a1a] rounded-2xl mb-4 overflow-hidden">
                 <div className="px-4 py-3 border-b border-[#1a1a1a]">
                   <h3 className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.15em]" style={{ fontFamily: "'Space Grotesk'" }}>
                     Permission Matrix
@@ -725,11 +725,11 @@ export default function SecurityPage() {
                             <td className="px-4 py-2.5 text-[10px] font-mono text-zinc-300">{p.service}</td>
                             <td className="px-4 py-2.5">
                               {isBlocked ? (
-                                <span className="px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30">
+                                <span className="px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/30 rounded-full">
                                   Permanently Blocked
                                 </span>
                               ) : (
-                                <span className="px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] text-[#00ffa3] bg-[#00ffa3]/10 border border-[#00ffa3]/30">
+                                <span className="px-2 py-0.5 text-[8px] font-bold uppercase tracking-[0.15em] text-[#00ffa3] bg-[#00ffa3]/10 border border-[#00ffa3]/30 rounded-full">
                                   Granted
                                 </span>
                               )}
@@ -745,9 +745,9 @@ export default function SecurityPage() {
 
               {/* Model JSON */}
               {fgaModel && (
-                <div className="bg-[#080808] border border-[#1a1a1a] mb-4">
+                <div className="bg-[#080808] border border-[#1a1a1a] rounded-2xl mb-4">
                   <button onClick={() => setFgaModelOpen(!fgaModelOpen)}
-                    className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-[#0a0a0a] transition">
+                    className="w-full px-4 py-3 flex items-center justify-between text-left rounded-2xl hover:bg-[#0a0a0a] active:scale-[0.99] transition-all duration-150">
                     <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.15em]" style={{ fontFamily: "'Space Grotesk'" }}>
                       FGA Model Definition (JSON)
                     </span>
@@ -758,7 +758,7 @@ export default function SecurityPage() {
                   </button>
                   {fgaModelOpen && (
                     <div className="px-4 pb-4 border-t border-[#1a1a1a]">
-                      <pre className="mt-3 p-3 bg-[#050505] border border-[#1a1a1a] overflow-x-auto text-[9px] font-mono text-zinc-400 leading-relaxed">
+                      <pre className="mt-3 p-3 bg-[#050505] border border-[#1a1a1a] rounded-xl overflow-x-auto text-[9px] font-mono text-zinc-400 leading-relaxed">
                         {JSON.stringify(fgaModel.model, null, 2)}
                       </pre>
                     </div>
@@ -767,7 +767,7 @@ export default function SecurityPage() {
               )}
 
               {/* Note */}
-              <div className="p-3 border border-[#00ffa3]/15 bg-[#00ffa3]/3">
+              <div className="p-3 border border-[#00ffa3]/15 bg-[#00ffa3]/3 rounded-xl">
                 <p className="text-[9px] font-mono text-[#00ffa3]/80 leading-relaxed">
                   Every tool call is checked against this model BEFORE execution. The agent cannot bypass FGA -- it is enforced at the framework level, not inside the agent. Even if the agent is compromised, the authorization boundary holds.
                 </p>
@@ -791,11 +791,11 @@ export default function SecurityPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <button onClick={loadAudit}
-                    className="px-2 py-1 text-[9px] font-mono text-zinc-500 border border-[#1a1a1a] hover:text-[#00ffa3] hover:border-[#00ffa3]/30 transition">
+                    className="px-2 py-1 text-[9px] font-mono text-zinc-500 border border-[#1a1a1a] rounded-lg hover:text-[#00ffa3] hover:border-[#00ffa3]/30 active:scale-[0.97] transition-all duration-150">
                     Refresh
                   </button>
                   <button onClick={async () => { await api("/audit/clear", { method: "POST" }); setAudit([]); }}
-                    className="px-2 py-1 text-[9px] font-mono text-zinc-600 border border-[#1a1a1a] hover:text-[#ef4444] hover:border-[#ef4444]/30 transition">
+                    className="px-2 py-1 text-[9px] font-mono text-zinc-600 border border-[#1a1a1a] rounded-lg hover:text-[#ef4444] hover:border-[#ef4444]/30 active:scale-[0.97] transition-all duration-150">
                     Clear
                   </button>
                 </div>
@@ -805,7 +805,7 @@ export default function SecurityPage() {
               <div className="flex gap-1 mb-4">
                 {(["all", "allowed", "blocked", "ciba"] as const).map((f) => (
                   <button key={f} onClick={() => setAuditFilter(f)}
-                    className={`px-3 py-1.5 text-[9px] font-bold tracking-[0.12em] uppercase transition ${
+                    className={`px-3 py-1.5 text-[9px] font-bold tracking-[0.12em] uppercase rounded-xl active:scale-[0.97] transition-all duration-150 ${
                       auditFilter === f
                         ? f === "blocked" ? "text-[#ef4444] bg-[#ef4444]/8 border border-[#ef4444]/30"
                           : f === "ciba" ? "text-[#f59e0b] bg-[#f59e0b]/8 border border-[#f59e0b]/30"
@@ -829,7 +829,7 @@ export default function SecurityPage() {
                   const isCiba = e.service.toLowerCase().includes("ciba");
                   return (
                     <div key={i}
-                      className={`flex items-start gap-3 px-3 py-2.5 border transition ${
+                      className={`flex items-start gap-3 px-3 py-2.5 border rounded-xl transition ${
                         isBlockedEntry
                           ? "border-[#ef4444]/15 blocked-dramatic"
                           : isCiba
@@ -853,7 +853,7 @@ export default function SecurityPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-[9px] font-mono text-zinc-600">{ts(e.timestamp)}</span>
                           <span className="text-[9px] font-mono text-zinc-400">{e.action}</span>
-                          <span className={`px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.15em] border ${
+                          <span className={`px-1.5 py-0.5 text-[7px] font-bold uppercase tracking-[0.15em] border rounded-full ${
                             e.permission_used === "read"
                               ? "text-[#00ffa3] border-[#00ffa3]/20 bg-[#00ffa3]/5"
                               : "text-[#ef4444] border-[#ef4444]/20 bg-[#ef4444]/5"
