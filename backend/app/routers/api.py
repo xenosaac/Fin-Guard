@@ -89,11 +89,66 @@ async def run_analysis(request: Request, response: Response):
     from app.agents.guardian import agent
     sess = _get_sess(request, response)
     result = await agent.analyze()
-    # Copy audit entries to session
     for entry in agent.audit_log[-20:]:
         if entry not in sess.audit_log:
             sess.audit_log.append(entry)
     return result
+
+
+@router.post("/agent/onboard")
+async def agent_onboard(request: Request, response: Response):
+    """AI agent auto-onboarding: connect all services, run analysis, return step-by-step."""
+    from app.agents.guardian import agent
+    sess = _get_sess(request, response)
+    steps = []
+
+    # Step 1-3: Auto-connect all services (session + global for analyzer compat)
+    from app.auth import connect_service as _global_connect, is_connected as _global_is_connected
+    for svc_id in ["financial_api", "google_sheets", "slack"]:
+        if not sess.is_connected(svc_id):
+            conn = sess.connect_service(svc_id)
+            if not _global_is_connected(svc_id):
+                try: _global_connect(svc_id)
+                except: pass
+            steps.append({
+                "step": f"connect_{svc_id}",
+                "status": "done",
+                "message": f"Connected {conn.service_name} via Token Vault (read-only)",
+            })
+        else:
+            steps.append({
+                "step": f"connect_{svc_id}",
+                "status": "already",
+                "message": f"Already connected",
+            })
+
+    # Step 4: Run analysis
+    result = await agent.analyze()
+    for entry in agent.audit_log[-20:]:
+        if entry not in sess.audit_log:
+            sess.audit_log.append(entry)
+    steps.append({
+        "step": "analyze",
+        "status": "done",
+        "message": f"Scanned {result.transactions_scanned} transactions, found {result.anomalies_found} anomalies",
+    })
+
+    # Step 5: Summary
+    steps.append({
+        "step": "summary",
+        "status": "done",
+        "message": result.summary,
+    })
+
+    return {
+        "steps": steps,
+        "profile": sess.profile,
+        "analysis": {
+            "transactions_scanned": result.transactions_scanned,
+            "anomalies_found": result.anomalies_found,
+            "summary": result.summary,
+        },
+    }
 
 
 @router.post("/analyze/demo-blocked-write")
