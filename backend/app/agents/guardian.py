@@ -1,20 +1,19 @@
 """Fin-Guard AI Agent — the read-only financial guardian.
 
-Uses Claude (Anthropic) with tool use to orchestrate financial monitoring:
+Uses LLM (Claude or GPT) for intelligent financial analysis:
   - READ transactions (financial API via Token Vault)
   - READ budgets (Google Sheets via Token Vault)
   - DETECT anomalies (AI-powered pattern analysis)
   - SEND alerts (Slack via Token Vault)
   - NEVER write/modify financial data
 
-Falls back to rule-based detection if no Anthropic key is configured.
+Falls back to rule-based detection if no LLM key is configured.
 Every tool call is audited in the audit trail.
 """
 from __future__ import annotations
 
-import json
 from datetime import datetime
-from typing import Any, Optional
+from typing import Optional
 
 from app.config import settings
 from app.models.schemas import (
@@ -26,16 +25,28 @@ from app.models.schemas import (
 from app.tools.financial import detect_anomalies, get_transactions
 from app.tools.budget import analyze_budget, get_budget
 from app.tools.notifications import send_notification_batch
+from app.agents.llm import llm_analyze
 
 
-def _build_transaction_summary(transactions: list) -> str:
-    """Summarize transactions for Claude's analysis."""
+SYSTEM_PROMPT = (
+    "You are Fin-Guard, a read-only AI financial guardian. "
+    "You analyze spending patterns and flag concerns. "
+    "You can NEVER modify, move, or access financial accounts — only observe and alert. "
+    "Be concise and actionable. Focus on the most important findings. "
+    "Format: start with a one-sentence verdict, then bullet points for each concern."
+)
+
+
+def _build_analysis_prompt(transactions: list, budget_analysis: dict) -> str:
+    """Build the user prompt for LLM analysis."""
     total = sum(t.amount for t in transactions)
     by_cat: dict[str, float] = {}
     for t in transactions:
         by_cat[t.category] = by_cat.get(t.category, 0) + t.amount
 
     lines = [
+        f"Analyze these transactions and budget data.",
+        f"",
         f"Total transactions: {len(transactions)}",
         f"Total spent: ${total:,.2f}",
         f"Spending by category:",
@@ -43,68 +54,30 @@ def _build_transaction_summary(transactions: list) -> str:
     for cat, amt in sorted(by_cat.items(), key=lambda x: -x[1]):
         lines.append(f"  - {cat}: ${amt:,.2f}")
 
-    # Include suspicious items
     suspicious = [t for t in transactions if t.amount > 500 or t.category == "unknown"]
     if suspicious:
         lines.append(f"\nLarge/unusual transactions ({len(suspicious)}):")
         for t in suspicious[:10]:
             lines.append(
-                f"  - ${t.amount:,.2f} at {t.merchant} ({t.category}) on {t.date.strftime('%Y-%m-%d')}"
+                f"  - ${t.amount:,.2f} at {t.merchant} ({t.category}) "
+                f"on {t.date.strftime('%Y-%m-%d')}"
             )
+
+    over_budget = budget_analysis.get("over_budget_categories", [])
+    if over_budget:
+        lines.append("\nBudget alerts:")
+        for c in over_budget:
+            lines.append(
+                f"  - {c['category']}: spent ${c['spent']:,.2f} vs "
+                f"${c['budget']:,.2f} budget ({c['pct_used']:.0f}%)"
+            )
+
+    lines.append(
+        f"\nProjected savings: ${budget_analysis.get('projected_savings', 0):,.2f} "
+        f"(target: $1,000.00)"
+    )
 
     return "\n".join(lines)
-
-
-async def _claude_analyze(
-    txn_summary: str, budget_analysis: dict
-) -> Optional[str]:
-    """Ask Claude to analyze financial data and identify concerns.
-
-    Returns Claude's analysis as a string, or None if API is unavailable.
-    """
-    if not settings.anthropic_api_key:
-        return None
-
-    try:
-        import anthropic
-
-        client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-
-        over_budget = budget_analysis.get("over_budget_categories", [])
-        budget_context = ""
-        if over_budget:
-            budget_context = "\n\nBudget alerts:\n" + "\n".join(
-                f"  - {c['category']}: spent ${c['spent']:,.2f} vs ${c['budget']:,.2f} budget ({c['pct_used']:.0f}%)"
-                for c in over_budget
-            )
-
-        message = client.messages.create(
-            model=settings.anthropic_model,
-            max_tokens=500,
-            system=(
-                "You are Fin-Guard, a read-only AI financial guardian. "
-                "You analyze spending patterns and flag concerns. "
-                "You can NEVER modify, move, or access financial accounts — only observe and alert. "
-                "Be concise and actionable. Focus on the most important findings."
-            ),
-            messages=[
-                {
-                    "role": "user",
-                    "content": (
-                        f"Analyze these transactions and budget data. "
-                        f"Identify the top concerns and provide a brief summary.\n\n"
-                        f"{txn_summary}"
-                        f"{budget_context}\n\n"
-                        f"Projected savings: ${budget_analysis.get('projected_savings', 0):,.2f} "
-                        f"(target: ${budget_analysis.get('savings_target', 1000):,.2f})"
-                    ),
-                }
-            ],
-        )
-        return message.content[0].text
-
-    except Exception as e:
-        return f"AI analysis unavailable: {e}"
 
 
 class GuardianAgent:
@@ -182,19 +155,29 @@ class GuardianAgent:
                 ),
             ))
 
-        # Step 5: AI analysis via Claude
+        # Step 5: AI analysis (Claude or GPT, whichever is configured)
         ai_summary = None
-        if settings.anthropic_api_key:
+        has_llm = settings.anthropic_api_key or settings.openai_api_key
+        if has_llm:
+            provider = settings.llm_provider
+            if settings.anthropic_api_key and not settings.openai_api_key:
+                provider = "anthropic"
+            elif settings.openai_api_key and not settings.anthropic_api_key:
+                provider = "openai"
+
             self._log_audit(AuditEntry(
                 timestamp=datetime.now(),
-                service="anthropic_claude",
+                service=f"llm:{provider}",
                 action="analyze_spending",
                 permission_used=PermissionLevel.READ,
                 success=True,
-                details="AI agent analyzing transaction patterns (read-only, no financial data sent to LLM — only aggregated summaries)",
+                details=(
+                    f"AI agent ({provider}) analyzing transaction patterns "
+                    f"(read-only — only aggregated summaries sent to LLM)"
+                ),
             ))
-            txn_summary = _build_transaction_summary(transactions)
-            ai_summary = await _claude_analyze(txn_summary, budget_analysis)
+            user_prompt = _build_analysis_prompt(transactions, budget_analysis)
+            ai_summary = await llm_analyze(SYSTEM_PROMPT, user_prompt)
 
         # Step 6: Send notifications
         self.status = "alerting"

@@ -10,9 +10,12 @@ class Settings(BaseSettings):
     auth0_audience: str = ""
     auth0_callback_url: str = "http://localhost:8000/callback"
 
-    # Anthropic (for AI agent reasoning)
+    # LLM (AI agent reasoning — supports both, uses whichever key is set)
+    llm_provider: str = "anthropic"  # "anthropic" or "openai"
     anthropic_api_key: str = ""
     anthropic_model: str = "claude-sonnet-4-20250514"
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o-mini"
 
     # App
     app_secret_key: str = "change-me-in-production"
