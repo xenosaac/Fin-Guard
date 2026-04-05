@@ -219,17 +219,19 @@ class GuardianAgent:
                 self._log_audit(ciba_audit)
 
         # Step 6: FGA check for alert permission + send notifications
+        # Limit to top 3 most significant anomalies to avoid alert fatigue
+        top_anomalies = sorted(anomalies, key=lambda x: -x.amount)[:3]
         self.status = "alerting"
         allowed, fga_audit = fga.check_permission("fin-guard", "writer", "slack_alerts")
         self._log_audit(fga_audit)
 
         if is_connected("slack") and allowed:
-            alerts, alert_audits = send_notification_batch(anomalies)
+            alerts, alert_audits = send_notification_batch(top_anomalies)
             for a in alert_audits:
                 self._log_audit(a)
         else:
             from app.tools.notifications import create_alert_from_anomaly
-            alerts = [create_alert_from_anomaly(txn) for txn in anomalies]
+            alerts = [create_alert_from_anomaly(txn) for txn in top_anomalies]
             if not is_connected("slack"):
                 self._log_blocked("slack", "send_alert",
                                   "Slack not connected. Alerts created in-app only.")
