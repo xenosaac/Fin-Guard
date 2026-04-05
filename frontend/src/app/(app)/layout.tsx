@@ -27,6 +27,8 @@ const ICONS: Record<string, React.ReactNode> = {
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [pendingCount, setPendingCount] = useState(0);
+  const [userName, setUserName] = useState("");
+  const [userInitials, setUserInitials] = useState("");
 
   useEffect(() => {
     const fetchPending = async () => {
@@ -38,7 +40,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         }
       } catch { /* ignore */ }
     };
+    const fetchProfile = async () => {
+      try {
+        const res = await fetch("/api/user/profile");
+        if (res.ok) {
+          const data = await res.json();
+          const name = data.name || "User";
+          setUserName(name.split(" ")[0] + " " + (name.split(" ")[1] || "").charAt(0) + ".");
+          setUserInitials(name.split(" ").map((p: string) => p[0]).join("").slice(0, 2).toUpperCase());
+        }
+      } catch { /* ignore */ }
+    };
     fetchPending();
+    fetchProfile();
     const iv = setInterval(fetchPending, 5000);
     return () => clearInterval(iv);
   }, []);
@@ -88,11 +102,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2.5">
             <div className="relative shrink-0">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#00ffa3]/30 to-[#00ffa3]/10 flex items-center justify-center">
-                <span className="text-[10px] font-bold text-[#00ffa3]" style={{ fontFamily: "'Space Grotesk'" }}>IZ</span>
+                <span className="text-[10px] font-bold text-[#00ffa3]" style={{ fontFamily: "'Space Grotesk'" }}>{userInitials || "?"}</span>
               </div>
               <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#00ffa3] border-2 border-[#0a0a0a]" />
             </div>
-            <span className="hidden lg:block text-[10px] text-zinc-400 font-medium tracking-wide">Isaac Z.</span>
+            <span className="hidden lg:block text-[10px] text-zinc-400 font-medium tracking-wide">{userName || "Loading..."}</span>
           </div>
 
           {/* Read-only status */}
