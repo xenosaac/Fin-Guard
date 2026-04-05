@@ -1,371 +1,400 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import {
-  api,
-  type Alert,
-  type AuditEntry,
-  type DashboardState,
-  type AnalysisResponse,
-  type ServiceConnection,
-} from "@/lib/api";
+import { useCallback, useEffect, useState, useRef } from "react";
 
-/* ── Icon helpers (inline SVG to avoid dep issues) ─────────────────────── */
+/* ── Types ─────────────────────────────────────────────────────────────── */
 
-function ShieldIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-    </svg>
-  );
+interface ServiceConnection {
+  service_id: string;
+  service_name: string;
+  permission: "read" | "none";
+  connected: boolean;
+  scopes: string[];
 }
 
-function AlertIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-      <line x1="12" y1="9" x2="12" y2="13" />
-      <line x1="12" y1="17" x2="12.01" y2="17" />
-    </svg>
-  );
+interface Alert {
+  id: string;
+  timestamp: string;
+  title: string;
+  description: string;
+  severity: "low" | "medium" | "high";
+  notified_via: string[];
 }
 
-function CheckIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
+interface AuditEntry {
+  timestamp: string;
+  service: string;
+  action: string;
+  permission_used: "read" | "none";
+  success: boolean;
+  details: string;
 }
 
-function XIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <line x1="18" y1="6" x2="6" y2="18" />
-      <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
+interface DashboardState {
+  connections: ServiceConnection[];
+  recent_alerts: Alert[];
+  audit_log: AuditEntry[];
+  agent_status: string;
 }
+
+interface AnalysisResponse {
+  summary: string;
+  alerts: Alert[];
+  transactions_scanned: number;
+  anomalies_found: number;
+}
+
+/* ── API ───────────────────────────────────────────────────────────────── */
+
+const API = "/api";
+const f = async <T,>(path: string, opts?: RequestInit): Promise<T> => {
+  const r = await fetch(`${API}${path}`, {
+    headers: { "Content-Type": "application/json" },
+    ...opts,
+  });
+  if (!r.ok) throw new Error(`${r.status}`);
+  return r.json();
+};
+
+/* ── Utility ───────────────────────────────────────────────────────────── */
+
+const ts = (iso: string) => {
+  try {
+    return new Date(iso).toLocaleTimeString("en-US", {
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch {
+    return "--:--:--";
+  }
+};
+
+const SERVICE_META: Record<string, { label: string; desc: string }> = {
+  financial_api: {
+    label: "PLAID_FINANCIAL",
+    desc: "Read-only transaction stream. Zero write access.",
+  },
+  google_sheets: {
+    label: "GSHEETS_BUDGET",
+    desc: "Budget spreadsheet observer. Read-only scope.",
+  },
+  slack: {
+    label: "SLACK_ALERTS",
+    desc: "Outbound alert channel. Notification delivery only.",
+  },
+};
 
 /* ── Main Dashboard ────────────────────────────────────────────────────── */
 
 export default function Dashboard() {
-  const [dashboard, setDashboard] = useState<DashboardState | null>(null);
+  const [dash, setDash] = useState<DashboardState | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
-  const [loading, setLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
+  const auditRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const data = await api.getDashboard();
-      setDashboard(data);
-      setError(null);
-    } catch (e: any) {
-      setError("Backend not running. Start with: uvicorn app.main:app --reload");
+      const d = await f<DashboardState>("/dashboard");
+      setDash(d);
+      setOffline(false);
+    } catch {
+      setOffline(true);
     }
   }, []);
 
   useEffect(() => {
     refresh();
-    const interval = setInterval(refresh, 5000);
-    return () => clearInterval(interval);
+    const iv = setInterval(refresh, 4000);
+    return () => clearInterval(iv);
   }, [refresh]);
 
-  const handleConnect = async (serviceId: string) => {
-    setLoading(true);
-    await api.connect(serviceId);
-    await refresh();
-    setLoading(false);
-  };
+  useEffect(() => {
+    auditRef.current?.scrollTo({ top: auditRef.current.scrollHeight, behavior: "smooth" });
+  }, [dash?.audit_log?.length]);
 
-  const handleDisconnect = async (serviceId: string) => {
-    setLoading(true);
-    await api.disconnect(serviceId);
-    await refresh();
-    setLoading(false);
+  const connect = async (id: string) => {
+    await f(`/connections/${id}/connect`, { method: "POST" });
+    refresh();
   };
-
-  const handleAnalyze = async () => {
+  const disconnect = async (id: string) => {
+    await f(`/connections/${id}/disconnect`, { method: "POST" });
+    refresh();
+  };
+  const runAnalysis = async () => {
     setAnalyzing(true);
     try {
-      const result = await api.analyze();
-      setAnalysis(result);
-      await refresh();
-    } catch (e: any) {
-      setError(e.message);
-    }
+      const r = await f<AnalysisResponse>("/analyze", { method: "POST" });
+      setAnalysis(r);
+      refresh();
+    } catch {}
     setAnalyzing(false);
   };
-
-  const handleDemoBlocked = async () => {
-    await api.demoBlockedWrite();
-    await refresh();
+  const demoBlocked = async () => {
+    await f("/analyze/demo-blocked-write", { method: "POST" });
+    refresh();
   };
-
-  const handleReset = async () => {
-    await api.reset();
+  const reset = async () => {
+    await f("/reset", { method: "POST" });
     setAnalysis(null);
-    await refresh();
+    refresh();
   };
+
+  const alerts = dash?.recent_alerts ?? [];
+  const audit = dash?.audit_log ?? [];
+  const conns = dash?.connections ?? [];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Header */}
-      <header className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <ShieldIcon className="w-10 h-10 text-emerald-400" />
-          <div>
-            <h1 className="text-3xl font-bold text-white">Fin-Guard</h1>
-            <p className="text-gray-400 text-sm">
-              Read-only AI financial guardian — powered by Auth0 Token Vault
-            </p>
+    <div className="h-screen flex flex-col bg-[#050505] text-white overflow-hidden selection:bg-[#00ffa3]/30">
+      {/* ── Header ──────────────────────────────────────────────── */}
+      <header className="flex items-center justify-between px-6 py-3 bg-[#0c0c0c] border-b border-[#1a1a1a] shrink-0">
+        <div className="flex items-center gap-6">
+          <h1 className="text-lg font-bold tracking-[-0.04em] text-[#00ffa3]" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            FIN—GUARD
+          </h1>
+          <div className="hidden md:flex items-center gap-1 text-[10px] tracking-[0.15em] text-zinc-600 uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00ffa3] animate-pulse" />
+            <span>System Active</span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="px-3 py-1 rounded-full text-xs font-mono bg-emerald-900/50 text-emerald-400 border border-emerald-800">
-            ZERO-TRUST MODE
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="px-2.5 py-1 text-[9px] font-bold tracking-[0.2em] text-[#00ffa3] border border-[#00ffa3]/20 bg-[#00ffa3]/5 uppercase">
+            Zero-Trust
+          </div>
           <button
-            onClick={handleReset}
-            className="px-3 py-1 rounded text-xs text-gray-400 hover:text-white border border-gray-700 hover:border-gray-500 transition"
+            onClick={reset}
+            className="px-2.5 py-1 text-[9px] tracking-[0.15em] text-zinc-600 border border-zinc-800 hover:border-zinc-600 hover:text-zinc-400 transition uppercase"
           >
-            Reset Demo
+            Reset
           </button>
         </div>
       </header>
 
-      {error && (
-        <div className="mb-6 p-4 rounded-lg bg-red-950/50 border border-red-800 text-red-300">
-          {error}
+      {offline && (
+        <div className="px-6 py-2 bg-red-950/40 text-red-400 text-[11px] font-mono text-center">
+          Backend offline — run: cd backend && uvicorn app.main:app --reload
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Connections + Controls */}
-        <div className="space-y-6">
-          {/* Service Connections */}
-          <section className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
-              Connected Services
+      {/* ── Main Grid ───────────────────────────────────────────── */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Column 1: Vault Connections */}
+        <section className="w-72 shrink-0 border-r border-[#1a1a1a] bg-[#0a0a0a] flex flex-col overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#1a1a1a]">
+            <h2 className="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase">
+              Token Vault
             </h2>
-            <div className="space-y-3">
-              {(dashboard?.connections ?? []).map((conn) => (
-                <ConnectionCard
-                  key={conn.service_id}
-                  conn={conn}
-                  onConnect={handleConnect}
-                  onDisconnect={handleDisconnect}
-                  loading={loading}
-                />
-              ))}
-            </div>
-          </section>
-
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            {conns.map((c) => {
+              const meta = SERVICE_META[c.service_id] ?? { label: c.service_id.toUpperCase(), desc: "" };
+              return (
+                <div
+                  key={c.service_id}
+                  className={`p-4 transition-all ${
+                    c.connected
+                      ? "bg-[#0f0f0f] border-l-2 border-[#00ffa3]"
+                      : "bg-[#0f0f0f] border-l-2 border-zinc-800 opacity-50"
+                  }`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[10px] font-mono text-zinc-400 tracking-tight">{meta.label}</span>
+                    <span
+                      className={`px-1.5 py-0.5 text-[8px] font-bold tracking-[0.15em] ${
+                        c.connected
+                          ? "text-[#00ffa3] bg-[#00ffa3]/10 border border-[#00ffa3]/20"
+                          : "text-zinc-600 bg-zinc-900 border border-zinc-800"
+                      }`}
+                    >
+                      {c.connected ? "READ-ONLY" : "OFFLINE"}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-zinc-600 font-mono leading-relaxed mb-3">{meta.desc}</p>
+                  <div className="text-[9px] text-zinc-700 font-mono mb-3 break-all">
+                    {c.scopes?.join(", ")}
+                  </div>
+                  {c.connected ? (
+                    <button
+                      onClick={() => disconnect(c.service_id)}
+                      className="w-full py-1.5 text-[9px] font-bold tracking-[0.15em] text-zinc-600 border border-zinc-800 hover:border-red-800 hover:text-red-400 transition uppercase"
+                    >
+                      Revoke Access
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => connect(c.service_id)}
+                      className="w-full py-1.5 text-[9px] font-bold tracking-[0.15em] text-[#00ffa3] border border-[#00ffa3]/30 hover:bg-[#00ffa3] hover:text-black transition uppercase"
+                    >
+                      Connect via Vault
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
           {/* Agent Controls */}
-          <section className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-            <h2 className="text-lg font-semibold mb-4">Agent Controls</h2>
-            <div className="space-y-3">
-              <button
-                onClick={handleAnalyze}
-                disabled={analyzing}
-                className="w-full py-3 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-500 transition"
-              >
-                {analyzing ? "Analyzing..." : "Run Financial Analysis"}
-              </button>
-              <button
-                onClick={handleDemoBlocked}
-                className="w-full py-2 rounded-lg text-sm border border-red-800 text-red-400 hover:bg-red-950/50 transition"
-              >
-                Demo: Try Write (Blocked)
-              </button>
-            </div>
+          <div className="p-4 border-t border-[#1a1a1a] space-y-2">
+            <button
+              onClick={runAnalysis}
+              disabled={analyzing}
+              className="w-full py-3 text-[10px] font-bold tracking-[0.2em] uppercase transition-all disabled:opacity-30 bg-[#00ffa3] text-black hover:bg-[#00ef99] active:scale-[0.98]"
+              style={{ boxShadow: analyzing ? "none" : "0 0 20px rgba(0,255,163,0.15)" }}
+            >
+              {analyzing ? "Analyzing..." : "Run Analysis"}
+            </button>
+            <button
+              onClick={demoBlocked}
+              className="w-full py-2 text-[9px] font-bold tracking-[0.15em] uppercase text-red-500/60 border border-red-900/30 hover:border-red-700 hover:text-red-400 transition"
+            >
+              Attempt Write (Blocked)
+            </button>
+          </div>
+        </section>
+
+        {/* Column 2: Alerts & Analysis */}
+        <section className="flex-1 min-w-0 border-r border-[#1a1a1a] bg-[#080808] flex flex-col overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#1a1a1a] flex items-center justify-between">
+            <h2 className="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase">
+              Agent Activity
+            </h2>
+            {alerts.length > 0 && (
+              <span className="px-2 py-0.5 text-[9px] font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20">
+                {alerts.length} ALERT{alerts.length !== 1 ? "S" : ""}
+              </span>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {/* AI Summary */}
             {analysis && (
-              <div className="mt-4 p-3 rounded-lg bg-gray-800 text-sm">
-                <p className="text-emerald-400 font-semibold mb-1">Analysis Complete</p>
-                <p className="text-gray-300">{analysis.summary}</p>
-                <div className="mt-2 flex gap-4 text-xs text-gray-500">
-                  <span>{analysis.transactions_scanned} txns scanned</span>
+              <div className="mx-4 mt-4 p-4 bg-[#0d0d0d] border-l-2 border-[#00ffa3]">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#00ffa3]" />
+                  <span className="text-[9px] font-bold tracking-[0.2em] text-[#00ffa3] uppercase">
+                    AI Analysis Complete
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-300 font-mono leading-relaxed whitespace-pre-wrap">
+                  {analysis.summary}
+                </p>
+                <div className="flex gap-4 mt-3 text-[9px] text-zinc-600 font-mono">
+                  <span>{analysis.transactions_scanned} txns</span>
                   <span>{analysis.anomalies_found} anomalies</span>
                 </div>
               </div>
             )}
-          </section>
-        </div>
 
-        {/* Middle Column: Alerts */}
-        <section className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <AlertIcon className="w-5 h-5 text-amber-400" />
-            Alerts
-            {(dashboard?.recent_alerts?.length ?? 0) > 0 && (
-              <span className="ml-auto px-2 py-0.5 rounded-full text-xs bg-amber-900/50 text-amber-400">
-                {dashboard!.recent_alerts.length}
-              </span>
-            )}
-          </h2>
-          <div className="space-y-3 max-h-[600px] overflow-y-auto">
-            {(dashboard?.recent_alerts ?? []).length === 0 ? (
-              <p className="text-gray-500 text-sm">
-                No alerts yet. Run an analysis to detect anomalies.
-              </p>
-            ) : (
-              dashboard!.recent_alerts.map((alert) => (
-                <AlertCard key={alert.id} alert={alert} />
-              ))
-            )}
+            {/* Alert Feed */}
+            <div className="p-4 space-y-3">
+              {alerts.length === 0 && !analysis && (
+                <div className="text-center py-16 text-zinc-700 text-[11px] font-mono">
+                  <div className="text-2xl mb-3 opacity-20">◇</div>
+                  No alerts. Run analysis to scan transactions.
+                </div>
+              )}
+              {alerts.map((a) => (
+                <div
+                  key={a.id}
+                  className={`p-4 transition-all ${
+                    a.severity === "high"
+                      ? "bg-[#0d0808] border-r-2 border-red-500"
+                      : a.severity === "medium"
+                      ? "bg-[#0d0c08] border-r-2 border-amber-500"
+                      : "bg-[#0d0d0d] border-r-2 border-zinc-700"
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span
+                      className={`text-[9px] font-bold tracking-[0.2em] uppercase ${
+                        a.severity === "high" ? "text-red-400" : a.severity === "medium" ? "text-amber-400" : "text-zinc-500"
+                      }`}
+                    >
+                      {a.severity}
+                    </span>
+                    <span className="text-[9px] font-mono text-zinc-700">{ts(a.timestamp)}</span>
+                  </div>
+                  <h3 className="text-[12px] font-semibold text-zinc-200 mb-1" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {a.title}
+                  </h3>
+                  <p className="text-[10px] text-zinc-500 font-mono leading-relaxed">{a.description}</p>
+                  {a.notified_via.length > 0 && (
+                    <div className="flex gap-1.5 mt-2">
+                      {a.notified_via.map((v) => (
+                        <span key={v} className="px-1.5 py-0.5 text-[8px] text-zinc-500 bg-zinc-900 border border-zinc-800 font-mono">
+                          {v}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
-        {/* Right Column: Audit Trail */}
-        <section className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-400" />
-            Audit Trail
-            <span className="ml-auto text-xs text-gray-500 font-normal">
-              Every agent action logged
-            </span>
-          </h2>
-          <div className="space-y-2 max-h-[600px] overflow-y-auto">
-            {(dashboard?.audit_log ?? []).length === 0 ? (
-              <p className="text-gray-500 text-sm">
-                No actions yet. The audit trail logs every API call.
-              </p>
-            ) : (
-              dashboard!.audit_log.map((entry, i) => (
-                <AuditCard key={i} entry={entry} />
-              ))
+        {/* Column 3: Audit Trail */}
+        <section className="w-96 shrink-0 bg-[#050505] flex flex-col overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#1a1a1a] flex items-center justify-between">
+            <h2 className="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase">
+              Audit Trail
+            </h2>
+            <span className="text-[9px] font-mono text-[#00ffa3] animate-pulse">LIVE</span>
+          </div>
+          <div ref={auditRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-1.5 font-mono text-[10px]">
+            {audit.length === 0 && (
+              <div className="text-center py-16 text-zinc-800 text-[10px]">
+                Awaiting agent actions...
+              </div>
             )}
+            {audit.map((e, i) => (
+              <div
+                key={i}
+                className={`flex gap-2 items-start py-1.5 px-2 transition-all ${
+                  !e.success
+                    ? "bg-red-950/20 border-l-2 border-red-500"
+                    : "border-l-2 border-transparent hover:border-[#00ffa3]/20 hover:bg-[#0a0a0a]"
+                }`}
+              >
+                <span className="text-zinc-700 shrink-0 w-14">{ts(e.timestamp)}</span>
+                {e.success ? (
+                  <span className="text-[#00ffa3] shrink-0">✓</span>
+                ) : (
+                  <span className="text-red-400 font-bold shrink-0">✗</span>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={e.success ? "text-zinc-300" : "text-red-300 font-bold"}>
+                      {e.service}.{e.action}
+                    </span>
+                    <span
+                      className={`px-1 py-0.5 text-[8px] tracking-wider ${
+                        e.success
+                          ? "text-[#00ffa3]/70 bg-[#00ffa3]/5"
+                          : "text-red-400 bg-red-500/10 font-bold"
+                      }`}
+                    >
+                      {e.success ? "READ" : "BLOCKED"}
+                    </span>
+                  </div>
+                  <div className={`mt-0.5 leading-relaxed ${e.success ? "text-zinc-600" : "text-red-400/70"}`}>
+                    {e.details}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       </div>
 
-      {/* Security Banner */}
-      <footer className="mt-8 p-4 rounded-xl bg-gray-900 border border-gray-800 text-center">
-        <p className="text-sm text-gray-400">
-          <span className="text-emerald-400 font-semibold">Security Model:</span>{" "}
-          Fin-Guard operates in permanent read-only mode. Financial data can be
-          observed but never modified. All access is audited. Connections can be
-          revoked per-service at any time.
-        </p>
+      {/* ── Footer ──────────────────────────────────────────────── */}
+      <footer className="px-6 py-2 bg-[#050505] border-t border-[#1a1a1a] flex justify-between text-[9px] tracking-[0.15em] text-zinc-700 uppercase font-mono shrink-0">
+        <span>
+          Security: <span className="text-[#00ffa3]">Read-Only</span> // All access audited // Write operations permanently disabled
+        </span>
+        <span>Powered by Auth0 Token Vault</span>
       </footer>
-    </div>
-  );
-}
-
-/* ── Sub-components ────────────────────────────────────────────────────── */
-
-function ConnectionCard({
-  conn,
-  onConnect,
-  onDisconnect,
-  loading,
-}: {
-  conn: ServiceConnection;
-  onConnect: (id: string) => void;
-  onDisconnect: (id: string) => void;
-  loading: boolean;
-}) {
-  return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-gray-800">
-      <div>
-        <p className="font-medium text-sm">{conn.service_name}</p>
-        <div className="flex items-center gap-2 mt-1">
-          {conn.connected ? (
-            <span className="flex items-center gap-1 text-xs text-emerald-400">
-              <CheckIcon className="w-3 h-3" /> READ-ONLY
-            </span>
-          ) : (
-            <span className="text-xs text-gray-500">Not connected</span>
-          )}
-        </div>
-      </div>
-      {conn.connected ? (
-        <button
-          onClick={() => onDisconnect(conn.service_id)}
-          disabled={loading}
-          className="px-3 py-1 rounded text-xs border border-red-800 text-red-400 hover:bg-red-950/50 transition"
-        >
-          Revoke
-        </button>
-      ) : (
-        <button
-          onClick={() => onConnect(conn.service_id)}
-          disabled={loading}
-          className="px-3 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600 text-white transition"
-        >
-          Connect
-        </button>
-      )}
-    </div>
-  );
-}
-
-function AlertCard({ alert }: { alert: Alert }) {
-  const severityColor = {
-    low: "border-gray-700 bg-gray-800",
-    medium: "border-amber-800 bg-amber-950/30",
-    high: "border-red-800 bg-red-950/30",
-  }[alert.severity];
-
-  const severityBadge = {
-    low: "bg-gray-700 text-gray-300",
-    medium: "bg-amber-900/50 text-amber-400",
-    high: "bg-red-900/50 text-red-400",
-  }[alert.severity];
-
-  return (
-    <div className={`p-3 rounded-lg border ${severityColor}`}>
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-medium">{alert.title}</p>
-        <span className={`px-2 py-0.5 rounded text-xs shrink-0 ${severityBadge}`}>
-          {alert.severity}
-        </span>
-      </div>
-      <p className="text-xs text-gray-400 mt-1">{alert.description}</p>
-      <div className="flex items-center gap-2 mt-2 text-xs text-gray-500">
-        <span>{new Date(alert.timestamp).toLocaleTimeString()}</span>
-        {alert.notified_via.map((v) => (
-          <span key={v} className="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">
-            {v}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AuditCard({ entry }: { entry: AuditEntry }) {
-  const isBlocked = !entry.success;
-  return (
-    <div
-      className={`p-2 rounded-lg text-xs ${
-        isBlocked
-          ? "bg-red-950/30 border border-red-900"
-          : "bg-gray-800"
-      }`}
-    >
-      <div className="flex items-center gap-2">
-        {isBlocked ? (
-          <XIcon className="w-3 h-3 text-red-400 shrink-0" />
-        ) : (
-          <CheckIcon className="w-3 h-3 text-emerald-400 shrink-0" />
-        )}
-        <span className="font-mono text-gray-300">
-          {entry.service}.{entry.action}
-        </span>
-        <span
-          className={`ml-auto px-1.5 py-0.5 rounded ${
-            entry.permission_used === "read"
-              ? "bg-emerald-900/50 text-emerald-400"
-              : "bg-red-900/50 text-red-400"
-          }`}
-        >
-          {entry.permission_used}
-        </span>
-      </div>
-      <p className="text-gray-500 mt-1 pl-5">{entry.details}</p>
     </div>
   );
 }

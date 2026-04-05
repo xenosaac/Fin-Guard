@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+/* Scrollbar — minimal, terminal-style */
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #1a1a1a; }
+::-webkit-scrollbar-thumb:hover { background: #00ffa3; }
+
+/* Selection */
+::selection { background: rgba(0, 255, 163, 0.2); }
+
+/* Pulse animation for live indicators */
+@keyframes soft-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-pulse { animation: soft-pulse 2s ease-in-out infinite; }
