@@ -80,6 +80,8 @@ export default function DashboardPage() {
   const [cibaOpen, setCibaOpen] = useState(false);
   const [cibaPendingCount, setCibaPendingCount] = useState(0);
   const [now, setNow] = useState(new Date());
+  const [toast, setToast] = useState<string | null>(null);
+  const [writeBlocked, setWriteBlocked] = useState(false);
 
   const auditRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
@@ -159,15 +161,33 @@ export default function DashboardPage() {
 
   async function runAnalysis() {
     setAnalyzing(true);
-    await fetch("/api/analyze", { method: "POST" });
+    try {
+      const res = await fetch("/api/analyze", { method: "POST" });
+      const body = await res.json().catch(() => ({}));
+      const txCount = body.transactions_scanned ?? body.scanned ?? "—";
+      const anomalies = body.anomalies_found ?? body.anomalies ?? 0;
+      setToast(`Analysis complete. ${txCount} transactions scanned, ${anomalies} anomalies found.`);
+      setTimeout(() => setToast(null), 4000);
+    } catch { /* swallow */ }
     setAnalyzing(false);
-    fetchDashboard();
+    await fetchDashboard();
     fetchScore();
+    // auto-scroll audit trail to show new entries
+    setTimeout(() => {
+      auditRef.current?.scrollTo({ top: auditRef.current.scrollHeight, behavior: "smooth" });
+    }, 200);
   }
 
   async function attemptWrite() {
+    setWriteBlocked(true);
     await fetch("/api/analyze", { method: "POST", headers: { "x-attempt": "write" } });
-    fetchDashboard();
+    await fetchDashboard();
+    // revert button text after 1 second
+    setTimeout(() => setWriteBlocked(false), 1000);
+    // auto-scroll audit trail to show the new BLOCKED entry
+    setTimeout(() => {
+      auditRef.current?.scrollTo({ top: auditRef.current.scrollHeight, behavior: "smooth" });
+    }, 200);
   }
 
   async function sendChat() {
@@ -204,6 +224,15 @@ export default function DashboardPage() {
     fetchCibaPending();
   }
 
+  /* -- Markdown helper ------------------------------------------------------ */
+
+  function renderMarkdown(text: string): string {
+    return text
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/(?<!\w)_(.+?)_(?!\w)/g, "<em>$1</em>")
+      .replace(/^- (.+)$/gm, "\u2022 $1");
+  }
+
   /* -- Derived ------------------------------------------------------------- */
 
   const connections = data?.connections ?? [];
@@ -221,6 +250,18 @@ export default function DashboardPage() {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#050505]">
       {/* scanning line when analyzing */}
       {(analyzing || agentState === "analyzing") && <div className="scanning-line" />}
+
+      {/* Toast notification */}
+      {toast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 fade-in">
+          <div className="flex items-center gap-2 px-4 py-2.5 bg-[#0a1a12] border border-[#00ffa3]/20 rounded-xl shadow-lg shadow-[#00ffa3]/10">
+            <svg className="w-3.5 h-3.5 text-[#00ffa3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span className="text-[10px] font-mono text-zinc-300">{toast}</span>
+          </div>
+        </div>
+      )}
 
       {/* -- Top Summary Bar ------------------------------------------------ */}
       <header className="shrink-0 flex items-center gap-6 px-5 py-3 bg-[#080808] border-b border-[#111]">
@@ -357,14 +398,27 @@ export default function DashboardPage() {
             className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest bg-[#00ffa3] text-[#050505] rounded-lg hover:brightness-110 hover:shadow-lg hover:shadow-[#00ffa3]/20 active:scale-[0.97] transition-all duration-150 disabled:opacity-40"
             style={{ fontFamily: "'Space Grotesk'" }}
           >
-            {analyzing ? "Analyzing\u2026" : "Run Analysis"}
+            {analyzing ? (
+              <>
+                <svg className="inline-block w-3 h-3 mr-1.5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+                  <path d="M12 2a10 10 0 019.95 9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+                </svg>
+                Analyzing&hellip;
+              </>
+            ) : "Run Analysis"}
           </button>
 
           <button
             onClick={attemptWrite}
-            className="w-full py-2 text-[10px] font-mono uppercase tracking-widest text-red-400 border border-red-400/20 rounded-lg hover:bg-red-400/5 hover:shadow-lg hover:shadow-red-400/5 active:scale-[0.97] transition-all duration-150"
+            disabled={writeBlocked}
+            className={`w-full py-2 text-[10px] font-mono uppercase tracking-widest rounded-lg active:scale-[0.97] transition-all duration-150 ${
+              writeBlocked
+                ? "text-white bg-red-500 border border-red-500 shadow-lg shadow-red-500/30 animate-[flash-red_0.3s_ease-out]"
+                : "text-red-400 border border-red-400/20 hover:bg-red-400/5 hover:shadow-lg hover:shadow-red-400/5"
+            }`}
           >
-            Attempt Write (Blocked)
+            {writeBlocked ? "BLOCKED" : "Attempt Write (Blocked)"}
           </button>
         </section>
 
@@ -431,7 +485,14 @@ export default function DashboardPage() {
                       )}
                     </div>
                   )}
-                  <p className="text-[11px] leading-relaxed font-mono whitespace-pre-wrap">{msg.text}</p>
+                  {msg.role === "agent" ? (
+                    <p
+                      className="text-[11px] leading-relaxed font-mono whitespace-pre-wrap"
+                      dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }}
+                    />
+                  ) : (
+                    <p className="text-[11px] leading-relaxed font-mono whitespace-pre-wrap">{msg.text}</p>
+                  )}
                   <span className="block text-[8px] text-zinc-700 mt-1 font-mono">
                     {new Date(msg.ts).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
                   </span>
