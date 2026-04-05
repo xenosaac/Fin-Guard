@@ -1,5 +1,6 @@
 """API routes for Fin-Guard backend."""
 from __future__ import annotations
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException
 
@@ -66,7 +67,7 @@ async def disconnect(service_id: str):
 # ── Agent Analysis ───────────────────────────────────────────────────────────
 
 @router.post("/analyze", response_model=AnalysisResponse)
-async def run_analysis(req: AnalysisRequest | None = None):
+async def run_analysis(req: Optional[AnalysisRequest] = None):
     """Trigger the Fin-Guard agent to analyze transactions.
 
     The agent will:
