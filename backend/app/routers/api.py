@@ -13,9 +13,20 @@ from app.models.schemas import (
     DashboardState,
     ServiceConnection,
 )
+from app.tools.accounts import (
+    get_accounts as _get_accounts,
+    get_account as _get_account,
+    get_account_transactions as _get_account_transactions,
+    get_balance_history as _get_balance_history,
+    get_profile as _get_profile,
+    update_profile as _update_profile,
+)
 from app.tools.notifications import clear_alerts, get_alerts
 from app.tools.ciba import ciba
 from app.tools.fga import fga
+from app.tools.scenarios import scenario_engine
+from app.tools.security_score import scorer
+from app.agents.chat import chat as agent_chat, get_history, clear_history
 
 router = APIRouter(prefix="/api", tags=["api"])
 
@@ -139,6 +150,84 @@ async def fga_check(agent_name: str = "fin-guard", relation: str = "viewer", ser
     return {"allowed": allowed, "agent": agent_name, "relation": relation, "service": service}
 
 
+# ── Chat (conversational agent) ──────────────────────────────────────────
+
+@router.post("/chat")
+async def chat_endpoint(message: str = "What can you do?"):
+    """Chat with Fin-Guard agent. The agent uses tools with FGA enforcement."""
+    return await agent_chat(message)
+
+
+@router.get("/chat/history")
+async def chat_history():
+    """Get conversation history."""
+    return get_history()
+
+
+@router.post("/chat/clear")
+async def chat_clear():
+    """Clear conversation history."""
+    clear_history()
+    return {"status": "cleared"}
+
+
+# ── Threat Scenarios ────────────────────────────────────────────────
+
+@router.get("/scenarios")
+async def list_scenarios():
+    """List all available attack scenarios (metadata only)."""
+    return scenario_engine.list_scenarios()
+
+
+@router.get("/scenarios/{scenario_id}")
+async def get_scenario(scenario_id: str):
+    """Get full scenario including all steps."""
+    try:
+        return scenario_engine.get_scenario(scenario_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Scenario not found")
+
+
+@router.post("/scenarios/{scenario_id}/step/{step_number}")
+async def execute_scenario_step(scenario_id: str, step_number: int):
+    """Execute a single attack scenario step against real security layers."""
+    try:
+        result = await scenario_engine.execute_step(scenario_id, step_number)
+        # Also push audit entries to the main agent log
+        for entry_data in result["audit_entries"]:
+            agent.audit_log.append(AuditEntry(**entry_data))
+        return result
+    except (KeyError, ValueError) as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.post("/scenarios/{scenario_id}/run")
+async def run_full_scenario(scenario_id: str):
+    """Execute all steps of a scenario in sequence."""
+    try:
+        results = await scenario_engine.execute_full_scenario(scenario_id)
+        for r in results:
+            for entry_data in r["audit_entries"]:
+                agent.audit_log.append(AuditEntry(**entry_data))
+        return results
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Scenario not found")
+
+
+# ── Security Score ──────────────────────────────────────────────────
+
+@router.get("/security-score")
+async def security_score():
+    """Get current security posture score with dimension breakdown."""
+    return scorer.calculate()
+
+
+@router.get("/security-score/trend")
+async def security_score_trend():
+    """Get 7-day score trend for sparkline chart."""
+    return scorer.get_trend()
+
+
 # ── Alerts ───────────────────────────────────────────────────────────────
 
 @router.get("/alerts")
@@ -164,6 +253,81 @@ async def get_audit_trail():
 async def clear_audit():
     agent.clear_audit_log()
     return {"status": "cleared"}
+
+
+# ── Accounts ────────────────────────────────────────────────────────────
+
+
+@router.get("/accounts")
+async def list_accounts():
+    """List all linked bank accounts."""
+    allowed, fga_audit = fga.check_permission("fin-guard", "viewer", "financial_api")
+    agent.audit_log.append(fga_audit)
+    if not allowed:
+        raise HTTPException(status_code=403, detail="FGA: read not permitted")
+    return _get_accounts()
+
+
+@router.get("/accounts/{account_id}")
+async def get_single_account(account_id: str):
+    """Get details for a single account."""
+    allowed, fga_audit = fga.check_permission("fin-guard", "viewer", "financial_api")
+    agent.audit_log.append(fga_audit)
+    if not allowed:
+        raise HTTPException(status_code=403, detail="FGA: read not permitted")
+    try:
+        return _get_account(account_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/accounts/{account_id}/transactions")
+async def account_transactions(account_id: str, days: int = 30):
+    """Get mock transactions for an account."""
+    allowed, fga_audit = fga.check_permission("fin-guard", "viewer", "financial_api")
+    agent.audit_log.append(fga_audit)
+    if not allowed:
+        raise HTTPException(status_code=403, detail="FGA: read not permitted")
+    try:
+        return _get_account_transactions(account_id, days)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/accounts/{account_id}/balance-history")
+async def account_balance_history(account_id: str, days: int = 7):
+    """Get daily closing balance history for an account."""
+    allowed, fga_audit = fga.check_permission("fin-guard", "viewer", "financial_api")
+    agent.audit_log.append(fga_audit)
+    if not allowed:
+        raise HTTPException(status_code=403, detail="FGA: read not permitted")
+    try:
+        return _get_balance_history(account_id, days)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# ── User Profile ────────────────────────────────────────────────────────
+
+
+@router.get("/user/profile")
+async def user_profile():
+    """Get the current user profile."""
+    allowed, fga_audit = fga.check_permission("fin-guard", "viewer", "financial_api")
+    agent.audit_log.append(fga_audit)
+    if not allowed:
+        raise HTTPException(status_code=403, detail="FGA: read not permitted")
+    return _get_profile()
+
+
+@router.post("/user/profile")
+async def update_user_profile(updates: dict):
+    """Update user profile fields (demo only)."""
+    allowed, fga_audit = fga.check_permission("fin-guard", "viewer", "financial_api")
+    agent.audit_log.append(fga_audit)
+    if not allowed:
+        raise HTTPException(status_code=403, detail="FGA: write not permitted")
+    return _update_profile(updates)
 
 
 # ── Demo Reset ───────────────────────────────────────────────────────────
