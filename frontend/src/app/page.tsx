@@ -16,7 +16,7 @@ const STATS = [
 const FEATURES = [
   {
     title: "Token Vault",
-    desc: "Read-only OAuth tokens via Auth0. Your agent gets scoped access \u2014 never raw credentials.",
+    desc: "Read-only OAuth tokens via Auth0. Your agent gets scoped access — never raw credentials.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5">
         <rect x="3" y="11" width="18" height="11" rx="2" />
@@ -46,7 +46,7 @@ const FEATURES = [
   },
   {
     title: "Audit Trail",
-    desc: "Every API call, every permission check, every blocked attempt \u2014 logged with timestamps.",
+    desc: "Every API call, every permission check, every blocked attempt — logged with timestamps.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-5 h-5">
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -85,7 +85,7 @@ const STEPS = [
   {
     num: "01",
     title: "Connect your accounts",
-    desc: "Auth0 Token Vault manages OAuth tokens. Your agent gets read-only scoped tokens \u2014 never raw credentials. RFC 8693 token exchange ensures minimal privilege.",
+    desc: "Auth0 Token Vault manages OAuth tokens. Your agent gets read-only scoped tokens — never raw credentials. RFC 8693 token exchange ensures minimal privilege.",
   },
   {
     num: "02",
@@ -100,7 +100,7 @@ const STEPS = [
   {
     num: "04",
     title: "Full transparency",
-    desc: "Every API call, every FGA check, every blocked write attempt \u2014 logged and visible. You see exactly what your AI agent did and why.",
+    desc: "Every API call, every FGA check, every blocked write attempt — logged and visible. You see exactly what your AI agent did and why.",
   },
 ];
 
@@ -182,7 +182,7 @@ export default function LandingPage() {
               className="text-lg font-bold tracking-[-0.04em] text-[#00ffa3]"
               style={{ fontFamily: "'Space Grotesk'" }}
             >
-              FIN\u2014GUARD
+              FIN—GUARD
             </span>
           </div>
           <div className="flex items-center gap-3">
