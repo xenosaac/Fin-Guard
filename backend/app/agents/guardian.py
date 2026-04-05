@@ -119,10 +119,15 @@ class GuardianAgent:
         """
         self.status = "analyzing"
 
-        # Check connection state — only access services that are connected
         from app.auth import is_connected
+        from app.tools.fga import fga
+        from app.tools.ciba import ciba
 
-        # Step 1: Read transactions (only if financial_api connected)
+        # ── FGA Pre-check: verify agent has viewer permission ──
+        allowed, fga_audit = fga.check_permission("fin-guard", "viewer", "financial_api")
+        self._log_audit(fga_audit)
+
+        # Step 1: Read transactions (FGA + connection check)
         if not is_connected("financial_api"):
             self._log_blocked("financial_api", "read_transactions",
                               "Service not connected. Connect via Token Vault first.")
@@ -136,10 +141,12 @@ class GuardianAgent:
         transactions, txn_audit = get_transactions(days=30)
         self._log_audit(txn_audit)
 
-        # Step 2: Read budget (only if google_sheets connected)
+        # Step 2: Read budget (FGA + connection check)
         budget = None
         budget_analysis = {"over_budget_categories": [], "projected_savings": 0, "savings_on_track": True}
         if is_connected("google_sheets"):
+            allowed, fga_audit = fga.check_permission("fin-guard", "viewer", "google_sheets")
+            self._log_audit(fga_audit)
             budget, budget_audit = get_budget()
             self._log_audit(budget_audit)
         else:
@@ -199,18 +206,33 @@ class GuardianAgent:
             user_prompt = _build_analysis_prompt(transactions, budget_analysis)
             ai_summary = await llm_analyze(SYSTEM_PROMPT, user_prompt)
 
-        # Step 6: Send notifications (only if slack connected)
+        # Step 5b: CIBA for high-risk anomalies
+        high_risk = [a for a in anomalies if a.amount > 1000]
+        if high_risk:
+            self.status = "awaiting_approval"
+            for txn in high_risk:
+                req_id, ciba_audit = await ciba.request_approval(
+                    action=f"escalate_alert:{txn.merchant}",
+                    reason=f"${txn.amount:,.2f} flagged — {txn.anomaly_reason}",
+                    risk_level="high",
+                )
+                self._log_audit(ciba_audit)
+
+        # Step 6: FGA check for alert permission + send notifications
         self.status = "alerting"
-        if is_connected("slack"):
+        allowed, fga_audit = fga.check_permission("fin-guard", "writer", "slack_alerts")
+        self._log_audit(fga_audit)
+
+        if is_connected("slack") and allowed:
             alerts, alert_audits = send_notification_batch(anomalies)
             for a in alert_audits:
                 self._log_audit(a)
         else:
-            # Create alerts in-app only, no Slack
             from app.tools.notifications import create_alert_from_anomaly
             alerts = [create_alert_from_anomaly(txn) for txn in anomalies]
-            self._log_blocked("slack", "send_alert",
-                              "Slack not connected. Alerts created in-app only.")
+            if not is_connected("slack"):
+                self._log_blocked("slack", "send_alert",
+                                  "Slack not connected. Alerts created in-app only.")
 
         # Build summary
         if ai_summary:

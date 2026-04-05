@@ -91,6 +91,8 @@ export default function Dashboard() {
   const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [offline, setOffline] = useState(false);
+  const [cibaRequests, setCibaRequests] = useState<any[]>([]);
+  const [fgaPerms, setFgaPerms] = useState<any[]>([]);
   const auditRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
@@ -98,6 +100,8 @@ export default function Dashboard() {
       const d = await f<DashboardState>("/dashboard");
       setDash(d);
       setOffline(false);
+      try { setCibaRequests(await f<any[]>("/ciba/pending")); } catch {}
+      try { if (fgaPerms.length === 0) setFgaPerms(await f<any[]>("/fga/permissions")); } catch {}
     } catch { setOffline(true); }
   }, []);
 
@@ -131,6 +135,14 @@ export default function Dashboard() {
   };
   const reset = async () => {
     try { await f("/reset", { method: "POST" }); setAnalysis(null); refresh(); }
+    catch { setOffline(true); }
+  };
+  const cibaApprove = async (id: string) => {
+    try { await f(`/ciba/${id}/approve`, { method: "POST" }); refresh(); }
+    catch { setOffline(true); }
+  };
+  const cibaDeny = async (id: string) => {
+    try { await f(`/ciba/${id}/deny`, { method: "POST" }); refresh(); }
     catch { setOffline(true); }
   };
 
@@ -265,7 +277,7 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Column 2: Alerts & Analysis */}
+        {/* Column 2: Alerts + CIBA + FGA */}
         <section className="flex-1 min-w-0 border-b lg:border-b-0 lg:border-r border-[#1a1a1a] bg-[#080808] flex flex-col overflow-hidden">
           <div className="px-5 py-4 border-b border-[#1a1a1a] flex items-center justify-between">
             <h2 className="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase">
@@ -315,9 +327,60 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* CIBA Approval Requests */}
+            {cibaRequests.length > 0 && (
+              <div className="mx-4 mt-3 space-y-2">
+                {cibaRequests.map((req: any) => (
+                  <div key={req.request_id} className="p-4 bg-amber-950/20 border border-amber-500/30 fade-in">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-amber-400 text-sm">⚡</span>
+                      <span className="text-[9px] font-bold tracking-[0.2em] text-amber-400 uppercase">
+                        CIBA — Approval Required
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-zinc-300 font-mono mb-1">{req.action}</p>
+                    <p className="text-[10px] text-zinc-500 font-mono mb-3">{req.reason}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => cibaApprove(req.request_id)}
+                        className="px-3 py-1.5 text-[9px] font-bold tracking-[0.15em] bg-[#00ffa3] text-black uppercase hover:bg-[#00ef99] transition">
+                        ✓ Approve
+                      </button>
+                      <button onClick={() => cibaDeny(req.request_id)}
+                        className="px-3 py-1.5 text-[9px] font-bold tracking-[0.15em] text-red-400 border border-red-800 uppercase hover:bg-red-950/50 transition">
+                        ✗ Deny
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* FGA Permission Matrix */}
+            {fgaPerms.length > 0 && (
+              <div className="mx-4 mt-3 p-3 bg-[#0b0b0b] border border-[#1a1a1a]">
+                <h3 className="text-[9px] font-bold tracking-[0.2em] text-zinc-500 uppercase mb-2">
+                  FGA Permission Matrix
+                </h3>
+                <div className="space-y-1">
+                  {fgaPerms.map((p: any, i: number) => (
+                    <div key={i} className="flex items-center justify-between text-[9px] font-mono py-1">
+                      <span className="text-zinc-400">{p.service}.{p.access}</span>
+                      <span className={`px-1.5 py-0.5 text-[8px] tracking-wider ${
+                        p.status === "GRANTED"
+                          ? "text-[#00ffa3] bg-[#00ffa3]/5"
+                          : "text-red-400 bg-red-500/10 font-bold"
+                      }`}>
+                        {p.status === "GRANTED" ? "✓ GRANTED" : "⛔ BLOCKED"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Alert Feed */}
             <div className="p-4 space-y-3">
-              {alerts.length === 0 && !analysis && !analyzing && (
+              {alerts.length === 0 && !analysis && !analyzing && cibaRequests.length === 0 && (
                 <div className="text-center py-16">
                   <svg className="w-12 h-12 mx-auto mb-4 text-zinc-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
