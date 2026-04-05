@@ -34,7 +34,7 @@ export default function ProfilePage() {
     <div className="flex-1 overflow-y-auto">
       {/* Toast */}
       <div
-        className={`fixed top-6 right-6 z-50 px-4 py-2.5 bg-[#00ffa3]/10 border border-[#00ffa3]/30 text-[#00ffa3] text-[11px] font-mono tracking-wider transition-all duration-300 ${
+        className={`fixed top-6 right-6 z-50 px-4 py-2.5 bg-[#00ffa3]/10 border border-[#00ffa3]/30 rounded-xl text-[#00ffa3] text-[11px] font-mono tracking-wider transition-all duration-300 ${
           toast ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2 pointer-events-none"
         }`}
       >
@@ -47,7 +47,7 @@ export default function ProfilePage() {
           <h1 className="text-lg font-bold tracking-[-0.03em] text-white" style={{ fontFamily: "'Space Grotesk'" }}>
             Profile
           </h1>
-          <span className="px-2 py-0.5 text-[9px] font-bold tracking-[0.15em] text-[#00ffa3] border border-[#00ffa3]/20 bg-[#00ffa3]/5 uppercase font-mono">
+          <span className="px-2 py-0.5 text-[9px] font-bold tracking-[0.15em] text-[#00ffa3] border border-[#00ffa3]/20 bg-[#00ffa3]/5 uppercase font-mono rounded-full">
             Connected via Auth0
           </span>
         </div>
@@ -58,8 +58,8 @@ export default function ProfilePage() {
 
       <div className="px-6 lg:px-10 py-8 space-y-6">
         {/* ── Profile Header Card ──────────────────────────────────────── */}
-        <div className="p-6 bg-[#0a0a0a] border border-[#1a1a1a] flex flex-col sm:flex-row sm:items-center gap-6">
-          <div className="w-16 h-16 shrink-0 bg-[#00ffa3]/10 border border-[#00ffa3]/20 flex items-center justify-center">
+        <div className="p-6 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl flex flex-col sm:flex-row sm:items-center gap-6">
+          <div className="w-16 h-16 shrink-0 bg-[#00ffa3]/10 border border-[#00ffa3]/20 rounded-2xl flex items-center justify-center">
             <span className="text-xl font-bold text-[#00ffa3]" style={{ fontFamily: "'Space Grotesk'" }}>IZ</span>
           </div>
           <div className="flex-1 min-w-0">
@@ -71,7 +71,7 @@ export default function ProfilePage() {
           </div>
           <button
             onClick={() => setEditing(!editing)}
-            className={`shrink-0 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] font-mono border transition-all ${
+            className={`shrink-0 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] font-mono border rounded-xl active:scale-[0.97] transition-all duration-150 ${
               editing
                 ? "text-yellow-400 border-yellow-400/30 bg-yellow-400/5 hover:bg-yellow-400/10"
                 : "text-[#00ffa3] border-[#00ffa3]/20 bg-[#00ffa3]/5 hover:bg-[#00ffa3]/10"
@@ -82,7 +82,7 @@ export default function ProfilePage() {
         </div>
 
         {/* ── Personal Information ─────────────────────────────────────── */}
-        <div className="p-6 bg-[#0a0a0a] border border-[#1a1a1a]">
+        <div className="p-6 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl">
           <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.15em] mb-5" style={{ fontFamily: "'Space Grotesk'" }}>
             Personal Information
           </h3>
@@ -94,7 +94,7 @@ export default function ProfilePage() {
                 <input
                   value={form.fullName}
                   onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                  className="w-full bg-[#080808] border border-[#2a2a2a] focus:border-[#00ffa3]/50 text-[13px] text-white px-3 py-2 font-mono outline-none transition-colors"
+                  className="w-full bg-[#080808] border border-[#2a2a2a] rounded-lg focus:border-[#00ffa3]/50 text-[13px] text-white px-3 py-2 font-mono outline-none transition-colors"
                 />
               ) : (
                 <span className="text-[13px] text-zinc-200 font-mono">{form.fullName}</span>
@@ -107,7 +107,7 @@ export default function ProfilePage() {
                 <input
                   value={form.nickname}
                   onChange={(e) => setForm({ ...form, nickname: e.target.value })}
-                  className="w-full bg-[#080808] border border-[#2a2a2a] focus:border-[#00ffa3]/50 text-[13px] text-white px-3 py-2 font-mono outline-none transition-colors"
+                  className="w-full bg-[#080808] border border-[#2a2a2a] rounded-lg focus:border-[#00ffa3]/50 text-[13px] text-white px-3 py-2 font-mono outline-none transition-colors"
                 />
               ) : (
                 <span className="text-[13px] text-zinc-200 font-mono">{form.nickname}</span>
@@ -127,7 +127,7 @@ export default function ProfilePage() {
                 <input
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                  className="w-full bg-[#080808] border border-[#2a2a2a] focus:border-[#00ffa3]/50 text-[13px] text-white px-3 py-2 font-mono outline-none transition-colors"
+                  className="w-full bg-[#080808] border border-[#2a2a2a] rounded-lg focus:border-[#00ffa3]/50 text-[13px] text-white px-3 py-2 font-mono outline-none transition-colors"
                 />
               ) : (
                 <span className="text-[13px] text-zinc-200 font-mono">{form.phone}</span>
@@ -141,7 +141,7 @@ export default function ProfilePage() {
                   type="date"
                   value={form.birthday}
                   onChange={(e) => setForm({ ...form, birthday: e.target.value })}
-                  className="w-full bg-[#080808] border border-[#2a2a2a] focus:border-[#00ffa3]/50 text-[13px] text-white px-3 py-2 font-mono outline-none transition-colors [color-scheme:dark]"
+                  className="w-full bg-[#080808] border border-[#2a2a2a] rounded-lg focus:border-[#00ffa3]/50 text-[13px] text-white px-3 py-2 font-mono outline-none transition-colors [color-scheme:dark]"
                 />
               ) : (
                 <span className="text-[13px] text-zinc-200 font-mono">{form.birthday}</span>
@@ -154,7 +154,7 @@ export default function ProfilePage() {
                 <input
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
-                  className="w-full bg-[#080808] border border-[#2a2a2a] focus:border-[#00ffa3]/50 text-[13px] text-white px-3 py-2 font-mono outline-none transition-colors"
+                  className="w-full bg-[#080808] border border-[#2a2a2a] rounded-lg focus:border-[#00ffa3]/50 text-[13px] text-white px-3 py-2 font-mono outline-none transition-colors"
                 />
               ) : (
                 <span className="text-[13px] text-zinc-200 font-mono">{form.address}</span>
@@ -165,7 +165,7 @@ export default function ProfilePage() {
             <div className="mt-5 flex justify-end">
               <button
                 onClick={handleSave}
-                className="px-5 py-2 text-[10px] font-bold uppercase tracking-[0.15em] font-mono text-black bg-[#00ffa3] hover:bg-[#00ffa3]/90 transition-colors"
+                className="px-5 py-2 text-[10px] font-bold uppercase tracking-[0.15em] font-mono text-black bg-[#00ffa3] rounded-xl hover:bg-[#00ffa3]/90 active:scale-[0.97] transition-all duration-150"
               >
                 Save Changes
               </button>
@@ -174,12 +174,12 @@ export default function ProfilePage() {
         </div>
 
         {/* ── Financial Profile (READ-ONLY) ────────────────────────────── */}
-        <div className="p-6 bg-[#0a0a0a] border border-[#1a1a1a]">
+        <div className="p-6 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.15em]" style={{ fontFamily: "'Space Grotesk'" }}>
               Financial Profile
             </h3>
-            <span className="px-2 py-0.5 text-[8px] font-bold tracking-[0.2em] text-red-400/70 border border-red-400/20 bg-red-400/5 uppercase font-mono">
+            <span className="px-2 py-0.5 text-[8px] font-bold tracking-[0.2em] text-red-400/70 border border-red-400/20 bg-red-400/5 uppercase font-mono rounded-full">
               Read-Only
             </span>
           </div>
@@ -189,9 +189,9 @@ export default function ProfilePage() {
               <span className="text-2xl font-bold text-[#00ffa3]" style={{ fontFamily: "'Space Grotesk'" }}>{ficoScore}</span>
               <span className="text-[10px] font-mono text-zinc-600">FICO Score</span>
             </div>
-            <div className="h-2 bg-[#1a1a1a] w-full overflow-hidden">
+            <div className="h-2 bg-[#1a1a1a] w-full overflow-hidden rounded-full">
               <div
-                className="h-full bg-gradient-to-r from-red-500 via-yellow-400 to-[#00ffa3] transition-all duration-700"
+                className="h-full bg-gradient-to-r from-red-500 via-yellow-400 to-[#00ffa3] rounded-full transition-all duration-700"
                 style={{ width: `${ficoPercent}%` }}
               />
             </div>
@@ -215,7 +215,7 @@ export default function ProfilePage() {
               <span className="text-lg font-bold text-zinc-200" style={{ fontFamily: "'Space Grotesk'" }}>8 yrs</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-2 border border-[#1a1a1a] bg-[#080808]">
+          <div className="flex items-center gap-2 px-3 py-2 border border-[#1a1a1a] bg-[#080808] rounded-xl">
             <svg className="w-3 h-3 text-red-400/60 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>
             </svg>
@@ -229,7 +229,7 @@ export default function ProfilePage() {
         </div>
 
         {/* ── Security Overview ─────────────────────────────────────────── */}
-        <div className="p-6 bg-[#0a0a0a] border border-[#1a1a1a]">
+        <div className="p-6 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl">
           <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.15em] mb-5" style={{ fontFamily: "'Space Grotesk'" }}>
             Security Overview
           </h3>
@@ -246,7 +246,7 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
-          <div className="flex items-center gap-2 px-3 py-2 border border-[#1a1a1a] bg-[#080808]">
+          <div className="flex items-center gap-2 px-3 py-2 border border-[#1a1a1a] bg-[#080808] rounded-xl">
             <svg className="w-3 h-3 text-[#00ffa3] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
@@ -257,7 +257,7 @@ export default function ProfilePage() {
         </div>
 
         {/* ── Connected Services ────────────────────────────────────────── */}
-        <div className="p-6 bg-[#0a0a0a] border border-[#1a1a1a]">
+        <div className="p-6 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl">
           <h3 className="text-[11px] font-bold text-zinc-400 uppercase tracking-[0.15em] mb-5" style={{ fontFamily: "'Space Grotesk'" }}>
             Connected Services
           </h3>
@@ -265,11 +265,11 @@ export default function ProfilePage() {
             {CONNECTED_SERVICES.map((svc) => (
               <div key={svc.name} className="flex items-center justify-between py-3 border-b border-[#1a1a1a] last:border-0">
                 <div className="flex items-center gap-3">
-                  <span className="w-2 h-2 bg-[#00ffa3]" />
+                  <span className="w-2 h-2 bg-[#00ffa3] rounded-full" />
                   <span className="text-[13px] text-zinc-200 font-mono">{svc.name}</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 text-[8px] font-bold tracking-[0.15em] uppercase font-mono border ${
+                  <span className={`px-2 py-0.5 text-[8px] font-bold tracking-[0.15em] uppercase font-mono border rounded-full ${
                     svc.scope === "READ-ONLY"
                       ? "text-red-400/70 border-red-400/20 bg-red-400/5"
                       : "text-yellow-400/70 border-yellow-400/20 bg-yellow-400/5"
@@ -284,13 +284,13 @@ export default function ProfilePage() {
         </div>
 
         {/* ── Danger Zone ──────────────────────────────────────────────── */}
-        <div className="p-6 bg-[#080808] border border-red-500/10">
+        <div className="p-6 bg-[#080808] border border-red-500/10 rounded-2xl">
           <h3 className="text-[11px] font-bold text-red-400/80 uppercase tracking-[0.15em] mb-5" style={{ fontFamily: "'Space Grotesk'" }}>
             Danger Zone
           </h3>
           {/* FGA Denied Message */}
           {dangerMsg && (
-            <div className="mb-4 px-4 py-3 bg-red-500/5 border border-red-500/20 text-[11px] font-mono text-red-400/80 leading-relaxed animate-[fadeIn_0.2s_ease-out]">
+            <div className="mb-4 px-4 py-3 bg-red-500/5 border border-red-500/20 rounded-xl text-[11px] font-mono text-red-400/80 leading-relaxed animate-[fadeIn_0.2s_ease-out]">
               {dangerMsg}
             </div>
           )}
@@ -299,7 +299,7 @@ export default function ProfilePage() {
               onClick={() =>
                 setDangerMsg("Account deletion requires admin access. FGA: fin-guard#admin@user_profile \u2192 DENIED")
               }
-              className="px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] font-mono text-red-400 border border-red-400/20 bg-red-400/5 hover:bg-red-400/10 transition-colors"
+              className="px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] font-mono text-red-400 border border-red-400/20 bg-red-400/5 rounded-xl hover:bg-red-400/10 active:scale-[0.97] transition-all duration-150"
             >
               Delete Account
             </button>
@@ -307,7 +307,7 @@ export default function ProfilePage() {
               onClick={() =>
                 setDangerMsg("Data export requires admin access. FGA: fin-guard#admin@user_data \u2192 DENIED")
               }
-              className="px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] font-mono text-red-400 border border-red-400/20 bg-red-400/5 hover:bg-red-400/10 transition-colors"
+              className="px-4 py-2 text-[10px] font-bold uppercase tracking-[0.15em] font-mono text-red-400 border border-red-400/20 bg-red-400/5 rounded-xl hover:bg-red-400/10 active:scale-[0.97] transition-all duration-150"
             >
               Export All Data
             </button>

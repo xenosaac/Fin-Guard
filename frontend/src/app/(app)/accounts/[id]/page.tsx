@@ -223,7 +223,7 @@ export default function AccountDetailPage() {
           </p>
           <Link
             href="/accounts"
-            className="inline-block px-4 py-2 text-[10px] font-bold tracking-[0.15em] text-[#00ffa3] border border-[#00ffa3]/30 uppercase hover:bg-[#00ffa3]/10 transition"
+            className="inline-block px-4 py-2 text-[10px] font-bold tracking-[0.15em] text-[#00ffa3] border border-[#00ffa3]/30 rounded-xl uppercase hover:bg-[#00ffa3]/10 active:scale-[0.97] transition-all duration-150"
           >
             &larr; Back to Accounts
           </Link>
@@ -245,7 +245,7 @@ export default function AccountDetailPage() {
         <div className="flex items-center gap-4">
           <Link
             href="/accounts"
-            className="px-2.5 py-1.5 text-[10px] font-bold tracking-[0.1em] text-zinc-500 border border-[#1a1a1a] hover:border-zinc-600 hover:text-zinc-300 transition uppercase font-mono"
+            className="px-2.5 py-1.5 text-[10px] font-bold tracking-[0.1em] text-zinc-500 border border-[#1a1a1a] rounded-lg hover:border-zinc-600 hover:text-zinc-300 active:scale-[0.97] transition-all duration-150 uppercase font-mono"
           >
             &larr; Back
           </Link>
@@ -271,7 +271,7 @@ export default function AccountDetailPage() {
           >
             {formatUSD(account.balance)}
           </span>
-          <span className="px-2 py-0.5 text-[8px] font-bold tracking-[0.2em] text-red-400/70 border border-red-400/20 bg-red-400/5 uppercase font-mono">
+          <span className="px-2 py-0.5 text-[8px] font-bold tracking-[0.2em] text-red-400/70 border border-red-400/20 bg-red-400/5 uppercase font-mono rounded-full">
             Read-Only
           </span>
         </div>
@@ -288,7 +288,7 @@ export default function AccountDetailPage() {
           ].map((item) => (
             <div
               key={item.label}
-              className="p-4 bg-[#0a0a0a] border border-[#1a1a1a]"
+              className="p-4 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl"
             >
               <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.2em] block mb-1">
                 {item.label}
@@ -304,7 +304,7 @@ export default function AccountDetailPage() {
         </div>
 
         {/* ── Balance History Chart (7-day, div-based) ─────────────── */}
-        <div className="p-5 bg-[#0a0a0a] border border-[#1a1a1a]">
+        <div className="p-5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl">
           <h2
             className="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase mb-5"
             style={{ fontFamily: "'Space Grotesk'" }}
@@ -341,7 +341,7 @@ export default function AccountDetailPage() {
         </div>
 
         {/* ── Recent Transactions Table ────────────────────────────── */}
-        <div className="bg-[#0a0a0a] border border-[#1a1a1a]">
+        <div className="bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl overflow-hidden">
           <div className="px-5 py-4 border-b border-[#1a1a1a] flex items-center justify-between">
             <h2
               className="text-[10px] font-bold tracking-[0.2em] text-zinc-500 uppercase"
@@ -389,7 +389,7 @@ export default function AccountDetailPage() {
                 </span>
                 <span>
                   <span
-                    className={`inline-block px-2 py-0.5 text-[8px] font-bold tracking-[0.1em] uppercase border ${catStyle}`}
+                    className={`inline-block px-2 py-0.5 text-[8px] font-bold tracking-[0.1em] uppercase border rounded-full ${catStyle}`}
                   >
                     {txn.category}
                   </span>
@@ -408,7 +408,7 @@ export default function AccountDetailPage() {
         </div>
 
         {/* ── FGA Security Note ────────────────────────────────────── */}
-        <div className="flex items-center gap-3 p-4 bg-[#080808] border border-[#1a1a1a]">
+        <div className="flex items-center gap-3 p-4 bg-[#080808] border border-[#1a1a1a] rounded-2xl">
           <svg
             className="w-4 h-4 text-[#00ffa3] shrink-0"
             viewBox="0 0 24 24"

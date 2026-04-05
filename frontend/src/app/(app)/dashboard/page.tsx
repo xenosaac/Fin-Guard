@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-/* ── Types ─────────────────────────────────────────────────────────── */
+/* -- Types ----------------------------------------------------------------- */
 
 interface Connection {
-  id: string;
-  service: string;
+  service_id: string;
   label: string;
   connected: boolean;
   permission: string;
@@ -24,10 +23,9 @@ interface AuditEntry {
   timestamp: string;
   service: string;
   action: string;
-  permission: string;
-  allowed: boolean;
+  permission_used: string;
+  success: boolean;
   details: string;
-  type?: string;
 }
 
 interface AgentStatus {
@@ -61,7 +59,7 @@ interface CIBARequest {
   reason: string;
 }
 
-/* ── Service config ────────────────────────────────────────────────── */
+/* -- Service config -------------------------------------------------------- */
 
 const SERVICES: Record<string, { icon: string; label: string; badge: string }> = {
   financial_api: { icon: "\uD83D\uDCB3", label: "PLAID_FINANCIAL", badge: "READ-ONLY" },
@@ -69,7 +67,7 @@ const SERVICES: Record<string, { icon: string; label: string; badge: string }> =
   slack:         { icon: "\uD83D\uDD14", label: "SLACK_ALERTS",    badge: "ALERT-ONLY" },
 };
 
-/* ── Component ─────────────────────────────────────────────────────── */
+/* -- Component ------------------------------------------------------------- */
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -79,12 +77,14 @@ export default function DashboardPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [ciba, setCiba] = useState<CIBARequest | null>(null);
+  const [cibaOpen, setCibaOpen] = useState(false);
+  const [cibaPendingCount, setCibaPendingCount] = useState(0);
   const [now, setNow] = useState(new Date());
 
   const auditRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
 
-  /* ── Fetch helpers ─────────────────────────────────────────────── */
+  /* -- Fetch helpers ------------------------------------------------------- */
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -92,13 +92,6 @@ export default function DashboardPage() {
       if (!res.ok) return;
       const d: DashboardData = await res.json();
       setData(d);
-      // surface any CIBA entries
-      const pending = d.audit_log.find(
-        (e) => e.type === "ciba" && e.permission === "PENDING",
-      );
-      if (pending) {
-        setCiba({ id: pending.id, action: pending.action, reason: pending.details });
-      }
     } catch { /* swallow */ }
   }, []);
 
@@ -110,15 +103,41 @@ export default function DashboardPage() {
     } catch { /* swallow */ }
   }, []);
 
-  /* ── Polling ───────────────────────────────────────────────────── */
+  const fetchCibaPending = useCallback(async () => {
+    try {
+      const res = await fetch("/api/ciba/pending");
+      if (!res.ok) {
+        setCibaPendingCount(0);
+        setCiba(null);
+        return;
+      }
+      const body = await res.json();
+      // body can be a single request object or an array
+      const pending: CIBARequest | null = Array.isArray(body)
+        ? body.length > 0 ? body[0] : null
+        : body?.id ? body : null;
+      const count = Array.isArray(body) ? body.length : (body?.id ? 1 : 0);
+      setCibaPendingCount(count);
+      setCiba(pending);
+    } catch {
+      setCibaPendingCount(0);
+      setCiba(null);
+    }
+  }, []);
+
+  /* -- Polling ------------------------------------------------------------- */
 
   useEffect(() => {
     fetchDashboard();
     fetchScore();
-    const id = setInterval(fetchDashboard, 4000);
+    fetchCibaPending();
+    const id = setInterval(() => {
+      fetchDashboard();
+      fetchCibaPending();
+    }, 4000);
     const clock = setInterval(() => setNow(new Date()), 1000);
     return () => { clearInterval(id); clearInterval(clock); };
-  }, [fetchDashboard, fetchScore]);
+  }, [fetchDashboard, fetchScore, fetchCibaPending]);
 
   /* auto-scroll audit + chat */
   useEffect(() => {
@@ -129,11 +148,11 @@ export default function DashboardPage() {
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: "smooth" });
   }, [chat.length, chatLoading]);
 
-  /* ── Actions ───────────────────────────────────────────────────── */
+  /* -- Actions ------------------------------------------------------------- */
 
-  async function toggleConnection(id: string, connected: boolean) {
+  async function toggleConnection(serviceId: string, connected: boolean) {
     const action = connected ? "disconnect" : "connect";
-    await fetch(`/api/connections/${id}/${action}`, { method: "POST" });
+    await fetch(`/api/connections/${serviceId}/${action}`, { method: "POST" });
     fetchDashboard();
     fetchScore();
   }
@@ -179,10 +198,13 @@ export default function DashboardPage() {
       body: JSON.stringify({ approved }),
     });
     setCiba(null);
+    setCibaOpen(false);
+    setCibaPendingCount((c) => Math.max(0, c - 1));
     fetchDashboard();
+    fetchCibaPending();
   }
 
-  /* ── Derived ───────────────────────────────────────────────────── */
+  /* -- Derived ------------------------------------------------------------- */
 
   const connections = data?.connections ?? [];
   const connectedCount = connections.filter((c) => c.connected).length;
@@ -193,14 +215,14 @@ export default function DashboardPage() {
   const gradeColor = (g: string) =>
     g === "A" || g === "A+" ? "#00ffa3" : g === "B" ? "#facc15" : "#ef4444";
 
-  /* ── Render ────────────────────────────────────────────────────── */
+  /* -- Render -------------------------------------------------------------- */
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#050505]">
       {/* scanning line when analyzing */}
       {(analyzing || agentState === "analyzing") && <div className="scanning-line" />}
 
-      {/* ── Top Summary Bar ─────────────────────────────────────── */}
+      {/* -- Top Summary Bar ------------------------------------------------ */}
       <header className="shrink-0 flex items-center gap-6 px-5 py-3 bg-[#080808] border-b border-[#111]">
         {/* Security Score */}
         <div className="flex items-center gap-2.5">
@@ -209,7 +231,7 @@ export default function DashboardPage() {
           </span>
           {score && (
             <span
-              className="text-[10px] font-bold px-1.5 py-0.5 rounded-sm"
+              className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg"
               style={{ color: gradeColor(score.grade), border: `1px solid ${gradeColor(score.grade)}33` }}
             >
               {score.grade}
@@ -247,6 +269,24 @@ export default function DashboardPage() {
         {/* spacer */}
         <div className="flex-1" />
 
+        {/* CIBA notification badge */}
+        {cibaPendingCount > 0 && (
+          <button
+            onClick={() => setCibaOpen(true)}
+            className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 hover:shadow-lg hover:shadow-amber-500/10 active:scale-[0.97] transition-all duration-150"
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <circle cx="12" cy="15" r="0.5" fill="currentColor" />
+            </svg>
+            <span className="text-[9px] font-bold uppercase tracking-widest font-mono">CIBA</span>
+            <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-[8px] font-bold text-black">
+              {cibaPendingCount}
+            </span>
+          </button>
+        )}
+
         {/* Clock */}
         <span className="text-[9px] text-zinc-600 font-mono tabular-nums tracking-wider">
           {now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" })}
@@ -255,10 +295,10 @@ export default function DashboardPage() {
         </span>
       </header>
 
-      {/* ── Main Grid ───────────────────────────────────────────── */}
+      {/* -- Main Grid ------------------------------------------------------ */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[280px_1fr_320px] overflow-hidden">
 
-        {/* ─── Left: Token Vault ─────────────────────────────────── */}
+        {/* --- Left: Token Vault ------------------------------------------- */}
         <section className="flex flex-col overflow-y-auto border-r border-[#111] bg-[#080808] p-4 gap-4">
           <h2 className="text-[10px] text-zinc-500 uppercase tracking-widest font-mono">Token Vault</h2>
 
@@ -282,25 +322,25 @@ export default function DashboardPage() {
           {/* Service cards */}
           {(["financial_api", "google_sheets", "slack"] as const).map((svcId) => {
             const svc = SERVICES[svcId];
-            const conn = connections.find((c) => c.id === svcId || c.service === svcId);
+            const conn = connections.find((c) => c.service_id === svcId);
             const isConn = conn?.connected ?? false;
             return (
-              <div key={svcId} className={`p-3 rounded-sm transition-all ${isConn ? "bg-[#0a1a12]" : "bg-[#0c0c0c]"}`}>
+              <div key={svcId} className={`p-3 rounded-xl transition-all duration-150 ${isConn ? "bg-[#0a1a12]" : "bg-[#0c0c0c]"}`}>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-sm">{svc.icon}</span>
                   <span className="text-[10px] font-mono text-zinc-300 tracking-wide flex-1">{svc.label}</span>
                   <span className={`w-1.5 h-1.5 rounded-full ${isConn ? "bg-[#00ffa3]" : "bg-zinc-700"}`} />
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 bg-[#111] text-zinc-500 rounded-sm">
+                  <span className="text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 bg-[#111] text-zinc-500 rounded-lg">
                     {svc.badge}
                   </span>
                   <button
                     onClick={() => toggleConnection(svcId, isConn)}
-                    className={`text-[9px] font-mono uppercase tracking-wider px-2 py-1 rounded-sm transition-colors ${
+                    className={`text-[9px] font-mono uppercase tracking-wider px-2 py-1 rounded-lg active:scale-[0.97] transition-all duration-150 ${
                       isConn
-                        ? "text-red-400 bg-red-400/5 hover:bg-red-400/10"
-                        : "text-[#00ffa3] bg-[#00ffa3]/5 hover:bg-[#00ffa3]/10"
+                        ? "text-red-400 bg-red-400/5 hover:bg-red-400/10 hover:shadow-lg hover:shadow-red-400/5"
+                        : "text-[#00ffa3] bg-[#00ffa3]/5 hover:bg-[#00ffa3]/10 hover:shadow-lg hover:shadow-[#00ffa3]/5"
                     }`}
                   >
                     {isConn ? "Disconnect" : "Connect"}
@@ -314,7 +354,7 @@ export default function DashboardPage() {
           <button
             onClick={runAnalysis}
             disabled={analyzing}
-            className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest bg-[#00ffa3] text-[#050505] rounded-sm hover:brightness-110 transition-all disabled:opacity-40"
+            className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest bg-[#00ffa3] text-[#050505] rounded-lg hover:brightness-110 hover:shadow-lg hover:shadow-[#00ffa3]/20 active:scale-[0.97] transition-all duration-150 disabled:opacity-40"
             style={{ fontFamily: "'Space Grotesk'" }}
           >
             {analyzing ? "Analyzing\u2026" : "Run Analysis"}
@@ -322,13 +362,13 @@ export default function DashboardPage() {
 
           <button
             onClick={attemptWrite}
-            className="w-full py-2 text-[10px] font-mono uppercase tracking-widest text-red-400 border border-red-400/20 rounded-sm hover:bg-red-400/5 transition-colors"
+            className="w-full py-2 text-[10px] font-mono uppercase tracking-widest text-red-400 border border-red-400/20 rounded-lg hover:bg-red-400/5 hover:shadow-lg hover:shadow-red-400/5 active:scale-[0.97] transition-all duration-150"
           >
             Attempt Write (Blocked)
           </button>
         </section>
 
-        {/* ─── Center: AI Agent Chat ─────────────────────────────── */}
+        {/* --- Center: AI Agent Chat --------------------------------------- */}
         <section className="flex flex-col overflow-hidden bg-[#050505]">
           {/* Header */}
           <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-[#111]">
@@ -358,7 +398,7 @@ export default function DashboardPage() {
                     <button
                       key={q}
                       onClick={() => { setChatInput(q); }}
-                      className="text-[9px] font-mono text-zinc-500 px-2.5 py-1.5 bg-[#0a0a0a] hover:bg-[#111] hover:text-zinc-300 rounded-sm transition-colors"
+                      className="text-[9px] font-mono text-zinc-500 px-2.5 py-1.5 bg-[#0a0a0a] hover:bg-[#111] hover:text-zinc-300 hover:shadow-lg rounded-lg active:scale-[0.97] transition-all duration-150"
                     >
                       {q}
                     </button>
@@ -373,7 +413,7 @@ export default function DashboardPage() {
                 className={`fade-in flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[80%] px-3 py-2.5 rounded-sm ${
+                  className={`max-w-[80%] px-3 py-2.5 rounded-xl ${
                     msg.role === "user"
                       ? "bg-[#00ffa3]/8 text-zinc-200"
                       : msg.blocked
@@ -401,7 +441,7 @@ export default function DashboardPage() {
 
             {chatLoading && (
               <div className="flex justify-start fade-in">
-                <div className="bg-[#0a0a0a] px-3 py-2.5 rounded-sm">
+                <div className="bg-[#0a0a0a] px-3 py-2.5 rounded-xl">
                   <div className="flex gap-1">
                     <span className="w-1 h-1 rounded-full bg-zinc-600 animate-pulse" style={{ animationDelay: "0ms" }} />
                     <span className="w-1 h-1 rounded-full bg-zinc-600 animate-pulse" style={{ animationDelay: "150ms" }} />
@@ -421,19 +461,19 @@ export default function DashboardPage() {
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               placeholder="Ask the guardian agent..."
-              className="flex-1 bg-[#0a0a0a] text-[11px] text-zinc-300 font-mono px-3 py-2 rounded-sm outline-none placeholder:text-zinc-700 focus:ring-1 focus:ring-[#00ffa3]/20"
+              className="flex-1 bg-[#0a0a0a] text-[11px] text-zinc-300 font-mono px-3 py-2 rounded-lg outline-none placeholder:text-zinc-700 focus:ring-1 focus:ring-[#00ffa3]/20 transition-all duration-150"
             />
             <button
               type="submit"
               disabled={chatLoading || !chatInput.trim()}
-              className="text-[9px] font-mono uppercase tracking-wider px-3 py-2 bg-[#00ffa3]/10 text-[#00ffa3] rounded-sm hover:bg-[#00ffa3]/20 transition-colors disabled:opacity-30"
+              className="text-[9px] font-mono uppercase tracking-wider px-3 py-2 bg-[#00ffa3]/10 text-[#00ffa3] rounded-lg hover:bg-[#00ffa3]/20 hover:shadow-lg hover:shadow-[#00ffa3]/10 active:scale-[0.97] transition-all duration-150 disabled:opacity-30"
             >
               Send
             </button>
           </form>
         </section>
 
-        {/* ─── Right: Audit Trail ────────────────────────────────── */}
+        {/* --- Right: Audit Trail ------------------------------------------ */}
         <section className="flex flex-col overflow-hidden border-l border-[#111] bg-[#080808]">
           {/* Header */}
           <div className="shrink-0 flex items-center gap-2 px-4 py-3 border-b border-[#111]">
@@ -452,17 +492,14 @@ export default function DashboardPage() {
               <p className="text-[9px] text-zinc-700 font-mono text-center py-8">No audit entries yet. Connect a service and run analysis.</p>
             )}
             {auditLog.map((entry, i) => {
-              const isCiba = entry.type === "ciba";
-              const isBlocked = !entry.allowed;
+              const isBlocked = !entry.success;
               return (
                 <div
                   key={entry.id ?? i}
-                  className={`px-3 py-2 rounded-sm fade-in ${
+                  className={`px-3 py-2 rounded-xl fade-in ${
                     isBlocked
                       ? "blocked-dramatic"
-                      : isCiba
-                        ? "bg-amber-500/5"
-                        : "bg-[#0a0a0a]"
+                      : "bg-[#0a0a0a]"
                   }`}
                 >
                   <div className="flex items-center gap-2">
@@ -484,15 +521,13 @@ export default function DashboardPage() {
 
                     {/* badge */}
                     <span
-                      className={`text-[7px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-sm ${
+                      className={`text-[7px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-lg ${
                         isBlocked
                           ? "text-red-400 bg-red-400/10"
-                          : isCiba
-                            ? "text-amber-400 bg-amber-400/10"
-                            : "text-[#00ffa3] bg-[#00ffa3]/10"
+                          : "text-[#00ffa3] bg-[#00ffa3]/10"
                       }`}
                     >
-                      {isBlocked ? "BLOCKED" : isCiba ? "CIBA" : "READ"}
+                      {isBlocked ? "BLOCKED" : "READ"}
                     </span>
                   </div>
 
@@ -510,10 +545,10 @@ export default function DashboardPage() {
         </section>
       </div>
 
-      {/* ── CIBA Overlay ──────────────────────────────────────────── */}
-      {ciba && (
+      {/* -- CIBA Overlay (only opens on explicit user click) --------------- */}
+      {cibaOpen && ciba && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#0a0a0a] border border-amber-500/20 rounded-sm p-8 max-w-md w-full mx-4 space-y-5 fade-in">
+          <div className="bg-[#0a0a0a] border border-amber-500/20 rounded-xl p-8 max-w-md w-full mx-4 space-y-5 fade-in">
             {/* pulsing icon */}
             <div className="flex justify-center">
               <div className="relative">
@@ -533,7 +568,7 @@ export default function DashboardPage() {
               <p className="text-[9px] text-zinc-500 font-mono">The agent is requesting elevated permission.</p>
             </div>
 
-            <div className="bg-[#111] p-3 rounded-sm space-y-2">
+            <div className="bg-[#111] p-3 rounded-xl space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-[8px] text-zinc-600 uppercase tracking-widest font-mono w-14">Action</span>
                 <span className="text-[10px] text-zinc-300 font-mono">{ciba.action}</span>
@@ -547,17 +582,23 @@ export default function DashboardPage() {
             <div className="flex gap-3">
               <button
                 onClick={() => respondCiba(true)}
-                className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest bg-[#00ffa3] text-[#050505] rounded-sm hover:brightness-110 transition-all"
+                className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest bg-[#00ffa3] text-[#050505] rounded-lg hover:brightness-110 hover:shadow-lg hover:shadow-[#00ffa3]/20 active:scale-[0.97] transition-all duration-150"
                 style={{ fontFamily: "'Space Grotesk'" }}
               >
                 Approve
               </button>
               <button
                 onClick={() => respondCiba(false)}
-                className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white rounded-sm hover:brightness-110 transition-all"
+                className="flex-1 py-2.5 text-[10px] font-bold uppercase tracking-widest bg-red-500 text-white rounded-lg hover:brightness-110 hover:shadow-lg hover:shadow-red-500/20 active:scale-[0.97] transition-all duration-150"
                 style={{ fontFamily: "'Space Grotesk'" }}
               >
                 Deny
+              </button>
+              <button
+                onClick={() => setCibaOpen(false)}
+                className="px-3 py-2.5 text-[10px] font-mono uppercase tracking-widest text-zinc-500 border border-zinc-700 rounded-lg hover:bg-zinc-800 hover:shadow-lg active:scale-[0.97] transition-all duration-150"
+              >
+                Close
               </button>
             </div>
           </div>

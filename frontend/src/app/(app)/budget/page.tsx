@@ -82,22 +82,22 @@ export default function BudgetPage() {
             >
               Budget Planner
             </h1>
-            <span className="px-2 py-0.5 text-[10px] font-mono text-zinc-400 border border-[#1a1a1a] bg-[#080808]">
+            <span className="px-2 py-0.5 text-[10px] font-mono text-zinc-400 border border-[#1a1a1a] bg-[#080808] rounded-lg">
               {MONTH}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 text-[9px] font-mono text-zinc-500 border border-[#1a1a1a] bg-[#080808]">
+            <span className="px-2 py-0.5 text-[9px] font-mono text-zinc-500 border border-[#1a1a1a] bg-[#080808] rounded-lg">
               via Google Sheets
             </span>
-            <span className="px-2 py-0.5 text-[9px] font-bold tracking-[0.15em] text-[#00ffa3] border border-[#00ffa3]/20 bg-[#00ffa3]/5 uppercase">
+            <span className="px-2 py-0.5 text-[9px] font-bold tracking-[0.15em] text-[#00ffa3] border border-[#00ffa3]/20 bg-[#00ffa3]/5 uppercase rounded-full">
               Read-Only
             </span>
           </div>
         </div>
 
         {/* ── Income & Savings Summary ────────────────────────────── */}
-        <div className="bg-[#080808] border border-[#1a1a1a] p-5">
+        <div className="bg-[#080808] border border-[#1a1a1a] rounded-2xl p-5">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             {[
               { label: "Monthly Income",    value: usd(INCOME),            accent: "text-white" },
@@ -126,9 +126,9 @@ export default function BudgetPage() {
                 {usd(PROJECTED_SAVINGS)} / {usd(SAVINGS_TARGET)} target
               </span>
             </div>
-            <div className="h-2 w-full bg-[#1a1a1a]">
+            <div className="h-2 w-full bg-[#1a1a1a] rounded-full">
               <div
-                className="h-full bg-[#00ffa3] transition-all"
+                className="h-full bg-[#00ffa3] rounded-full transition-all"
                 style={{ width: `${Math.min((PROJECTED_SAVINGS / SAVINGS_TARGET) * 100, 100)}%` }}
               />
             </div>
@@ -155,7 +155,7 @@ export default function BudgetPage() {
               return (
                 <div
                   key={cat.name}
-                  className={`p-4 border bg-[#080808] transition-colors ${
+                  className={`p-4 border bg-[#080808] rounded-2xl transition-colors ${
                     isOver
                       ? "border-[#ef4444]/30 bg-[#ef4444]/[0.02]"
                       : "border-[#1a1a1a] hover:border-[#00ffa3]/20"
@@ -193,9 +193,9 @@ export default function BudgetPage() {
                   </div>
 
                   {/* Progress bar */}
-                  <div className="h-1.5 w-full bg-[#1a1a1a] mb-2">
+                  <div className="h-1.5 w-full bg-[#1a1a1a] rounded-full mb-2">
                     <div
-                      className={`h-full transition-all ${barColor(cat.spent, cat.budget)}`}
+                      className={`h-full rounded-full transition-all ${barColor(cat.spent, cat.budget)}`}
                       style={{ width: `${Math.min(percentage, 100)}%` }}
                     />
                   </div>
@@ -216,7 +216,7 @@ export default function BudgetPage() {
             >
               Over-Budget Alerts
             </h2>
-            <div className="border border-[#ef4444]/20 bg-[#ef4444]/[0.03] p-4 space-y-3">
+            <div className="border border-[#ef4444]/20 bg-[#ef4444]/[0.03] rounded-2xl p-4 space-y-3">
               <div className="flex items-center gap-2 mb-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#ef4444] animate-pulse" />
                 <p className="text-[11px] font-bold text-[#ef4444]">
@@ -261,7 +261,7 @@ export default function BudgetPage() {
           >
             Monthly Spending Trend
           </h2>
-          <div className="bg-[#080808] border border-[#1a1a1a] p-5">
+          <div className="bg-[#080808] border border-[#1a1a1a] rounded-2xl p-5">
             <div className="flex items-end gap-3 h-40">
               {MONTHLY_TREND.map((m, i) => {
                 const heightPct = (m.spent / trendMax) * 100;
@@ -324,7 +324,7 @@ export default function BudgetPage() {
         </div>
 
         {/* ── FGA Security Footer ─────────────────────────────────── */}
-        <div className="border border-[#1a1a1a] bg-[#080808] px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="border border-[#1a1a1a] bg-[#080808] rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <svg
               className="w-3.5 h-3.5 text-[#00ffa3] shrink-0"
@@ -342,7 +342,7 @@ export default function BudgetPage() {
               Modification permanently blocked.
             </p>
           </div>
-          <span className="px-2 py-0.5 text-[8px] font-bold tracking-[0.2em] text-zinc-700 border border-[#1a1a1a] uppercase">
+          <span className="px-2 py-0.5 text-[8px] font-bold tracking-[0.2em] text-zinc-700 border border-[#1a1a1a] uppercase rounded-full">
             Auth0 FGA Verified
           </span>
         </div>

@@ -49,11 +49,11 @@ export default function LandingPage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="hidden sm:inline px-3 py-1 text-[9px] font-bold tracking-[0.2em] text-[#00ffa3] border border-[#00ffa3]/20 bg-[#00ffa3]/5 uppercase">
+          <span className="hidden sm:inline px-3 py-1 text-[9px] font-bold tracking-[0.2em] text-[#00ffa3] border border-[#00ffa3]/20 bg-[#00ffa3]/5 uppercase rounded-full">
             Zero-Trust
           </span>
           <Link href="/dashboard"
-            className="px-4 py-2 text-[10px] font-bold tracking-[0.15em] bg-[#00ffa3] text-black uppercase hover:bg-[#00ef99] transition">
+            className="px-4 py-2 text-[10px] font-bold tracking-[0.15em] bg-[#00ffa3] text-black uppercase rounded-xl hover:bg-[#00ef99] active:scale-[0.97] transition-all duration-150">
             Launch App →
           </Link>
         </div>
@@ -61,7 +61,7 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section className="px-6 lg:px-12 py-16 lg:py-24 max-w-5xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 text-[9px] font-mono text-zinc-500 border border-[#1a1a1a] bg-[#0a0a0a]">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 text-[9px] font-mono text-zinc-500 border border-[#1a1a1a] bg-[#0a0a0a] rounded-full">
           <span className="w-1.5 h-1.5 rounded-full bg-[#00ffa3]" />
           Powered by Auth0 Token Vault + FGA + CIBA
         </div>
@@ -80,12 +80,12 @@ export default function LandingPage() {
 
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link href="/dashboard"
-            className="px-6 py-3 text-[11px] font-bold tracking-[0.2em] bg-[#00ffa3] text-black uppercase hover:bg-[#00ef99] transition"
+            className="px-6 py-3 text-[11px] font-bold tracking-[0.2em] bg-[#00ffa3] text-black uppercase rounded-xl hover:bg-[#00ef99] active:scale-[0.97] transition-all duration-150"
             style={{ boxShadow: "0 0 30px rgba(0,255,163,0.15)" }}>
             Open Dashboard
           </Link>
           <Link href="/security"
-            className="px-6 py-3 text-[11px] font-bold tracking-[0.2em] text-[#00ffa3] border border-[#00ffa3]/30 uppercase hover:bg-[#00ffa3]/10 transition">
+            className="px-6 py-3 text-[11px] font-bold tracking-[0.2em] text-[#00ffa3] border border-[#00ffa3]/30 uppercase rounded-xl hover:bg-[#00ffa3]/10 active:scale-[0.97] transition-all duration-150">
             Try Threat Lab
           </Link>
         </div>
@@ -99,7 +99,7 @@ export default function LandingPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {FEATURES.map((feat) => (
-              <div key={feat.title} className="p-5 bg-[#0a0a0a] border border-[#1a1a1a] hover:border-[#00ffa3]/20 transition group">
+              <div key={feat.title} className="p-5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl hover:border-[#00ffa3]/20 transition group">
                 <div className="text-xl mb-3">{feat.icon}</div>
                 <h3 className="text-[12px] font-bold text-zinc-200 mb-2 group-hover:text-[#00ffa3] transition" style={{ fontFamily: "'Space Grotesk'" }}>
                   {feat.title}
@@ -124,7 +124,7 @@ export default function LandingPage() {
               { step: "03", title: "High-risk findings trigger CIBA", desc: "When the agent detects transactions over $1,000 or unusual patterns, it cannot act alone. Auth0 CIBA sends a push notification to your device for approval." },
               { step: "04", title: "Full audit trail", desc: "Every API call, every FGA permission check, every blocked write attempt is logged. Complete transparency into what your AI agent did and why." },
             ].map((item) => (
-              <div key={item.step} className="flex gap-4 p-4 bg-[#0a0a0a] border border-[#1a1a1a]">
+              <div key={item.step} className="flex gap-4 p-4 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl">
                 <span className="text-[20px] font-bold text-[#00ffa3]/30 shrink-0" style={{ fontFamily: "'Space Grotesk'" }}>{item.step}</span>
                 <div>
                   <h3 className="text-[11px] font-bold text-zinc-200 mb-1" style={{ fontFamily: "'Space Grotesk'" }}>{item.title}</h3>
@@ -145,7 +145,7 @@ export default function LandingPage() {
           Try the interactive Threat Lab. Run attack scenarios. Watch every Auth0 security layer fire.
         </p>
         <Link href="/dashboard"
-          className="inline-block px-8 py-3 text-[11px] font-bold tracking-[0.2em] bg-[#00ffa3] text-black uppercase hover:bg-[#00ef99] transition"
+          className="inline-block px-8 py-3 text-[11px] font-bold tracking-[0.2em] bg-[#00ffa3] text-black uppercase rounded-xl hover:bg-[#00ef99] active:scale-[0.97] transition-all duration-150"
           style={{ boxShadow: "0 0 40px rgba(0,255,163,0.2)" }}>
           Launch Fin-Guard
         </Link>

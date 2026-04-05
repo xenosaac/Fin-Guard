@@ -47,7 +47,7 @@ export default function AccountsPage() {
           >
             Accounts
           </h1>
-          <span className="px-2 py-0.5 text-[9px] font-bold tracking-[0.15em] text-[#00ffa3] border border-[#00ffa3]/20 bg-[#00ffa3]/5 uppercase font-mono">
+          <span className="px-2 py-0.5 text-[9px] font-bold tracking-[0.15em] text-[#00ffa3] border border-[#00ffa3]/20 bg-[#00ffa3]/5 uppercase font-mono rounded-full">
             Connected via Token Vault
           </span>
         </div>
@@ -63,7 +63,7 @@ export default function AccountsPage() {
             <Link
               key={acct.id}
               href={`/accounts/${acct.id}`}
-              className="group block p-5 bg-[#0a0a0a] border border-[#1a1a1a] hover:border-[#00ffa3]/30 transition-all"
+              className="group block p-5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl hover:border-[#00ffa3]/30 transition-all"
             >
               {/* Top row: icon + type badge + read-only */}
               <div className="flex items-center justify-between mb-4">
@@ -76,7 +76,7 @@ export default function AccountsPage() {
                     {acct.type}
                   </span>
                 </div>
-                <span className="px-2 py-0.5 text-[8px] font-bold tracking-[0.2em] text-red-400/70 border border-red-400/20 bg-red-400/5 uppercase font-mono">
+                <span className="px-2 py-0.5 text-[8px] font-bold tracking-[0.2em] text-red-400/70 border border-red-400/20 bg-red-400/5 uppercase font-mono rounded-full">
                   Read-Only
                 </span>
               </div>
@@ -116,7 +116,7 @@ export default function AccountsPage() {
         </div>
 
         {/* ── Summary Section ──────────────────────────────────────────── */}
-        <div className="p-5 bg-[#080808] border border-[#1a1a1a]">
+        <div className="p-5 bg-[#080808] border border-[#1a1a1a] rounded-2xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.2em] block mb-1">
@@ -132,7 +132,7 @@ export default function AccountsPage() {
                 {formatUSD(TOTAL)}
               </span>
             </div>
-            <div className="flex items-center gap-2 px-3 py-2 border border-[#1a1a1a] bg-[#0a0a0a]">
+            <div className="flex items-center gap-2 px-3 py-2 border border-[#1a1a1a] bg-[#0a0a0a] rounded-xl">
               <svg
                 className="w-3.5 h-3.5 text-[#00ffa3]"
                 viewBox="0 0 24 24"
