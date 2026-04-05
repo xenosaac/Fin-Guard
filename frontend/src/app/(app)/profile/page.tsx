@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const CONNECTED_SERVICES = [
   { name: "Chase Bank", scope: "READ-ONLY", date: "Mar 12, 2025" },
@@ -14,12 +14,44 @@ export default function ProfilePage() {
   const [dangerMsg, setDangerMsg] = useState<string | null>(null);
 
   const [form, setForm] = useState({
-    fullName: "Isaac Zhang",
-    nickname: "Isaac",
-    phone: "+1 (555) 123-4567",
-    birthday: "1995-06-15",
-    address: "123 Tech Street, San Francisco, CA 94107",
+    fullName: "",
+    nickname: "",
+    phone: "",
+    birthday: "",
+    address: "",
   });
+  const [email, setEmail] = useState("");
+  const [memberSince, setMemberSince] = useState("");
+  const [initials, setInitials] = useState("");
+  const [ficoFromApi, setFicoFromApi] = useState(742);
+  const [creditUtil, setCreditUtil] = useState(0.23);
+
+  useEffect(() => {
+    fetch("/api/user/profile")
+      .then((r) => r.json())
+      .then((p) => {
+        setForm({
+          fullName: p.name || "",
+          nickname: p.nickname || "",
+          phone: p.phone || "",
+          birthday: p.birthday || "",
+          address: p.address || "",
+        });
+        setEmail(p.email || "");
+        setMemberSince(p.member_since || "2025-03-01");
+        setInitials(
+          (p.name || "")
+            .split(" ")
+            .map((w: string) => w[0])
+            .join("")
+            .slice(0, 2)
+            .toUpperCase()
+        );
+        if (p.fico_score) setFicoFromApi(p.fico_score);
+        if (p.credit_utilization) setCreditUtil(p.credit_utilization);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSave = () => {
     setEditing(false);
@@ -27,7 +59,7 @@ export default function ProfilePage() {
     setTimeout(() => setToast(false), 2500);
   };
 
-  const ficoScore = 742;
+  const ficoScore = ficoFromApi;
   const ficoPercent = ((ficoScore - 300) / 550) * 100;
 
   return (
@@ -60,14 +92,14 @@ export default function ProfilePage() {
         {/* ── Profile Header Card ──────────────────────────────────────── */}
         <div className="p-6 bg-[#0a0a0a] border border-[#1a1a1a] rounded-2xl flex flex-col sm:flex-row sm:items-center gap-6">
           <div className="w-16 h-16 shrink-0 bg-[#00ffa3]/10 border border-[#00ffa3]/20 rounded-2xl flex items-center justify-center">
-            <span className="text-xl font-bold text-[#00ffa3]" style={{ fontFamily: "'Space Grotesk'" }}>IZ</span>
+            <span className="text-xl font-bold text-[#00ffa3]" style={{ fontFamily: "'Space Grotesk'" }}>{initials || "?"}</span>
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-bold text-white tracking-[-0.02em]" style={{ fontFamily: "'Space Grotesk'" }}>
-              Isaac Zhang
+              {form.fullName || "Loading..."}
             </h2>
-            <p className="text-[11px] font-mono text-zinc-500 mt-0.5">isaac@xiangliu.net</p>
-            <p className="text-[10px] text-zinc-600 mt-1">Member since March 2025</p>
+            <p className="text-[11px] font-mono text-zinc-500 mt-0.5">{email || "..."}</p>
+            <p className="text-[10px] text-zinc-600 mt-1">Member since {memberSince || "..."}</p>
           </div>
           <button
             onClick={() => setEditing(!editing)}
@@ -118,7 +150,7 @@ export default function ProfilePage() {
               <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.2em] block mb-1.5">
                 Email <span className="text-zinc-700 ml-1">managed by Auth0</span>
               </span>
-              <span className="text-[13px] text-zinc-500 font-mono">isaac@xiangliu.net</span>
+              <span className="text-[13px] text-zinc-500 font-mono">{email}</span>
             </label>
             {/* Phone */}
             <label className="block">
@@ -204,7 +236,7 @@ export default function ProfilePage() {
           <div className="grid grid-cols-3 gap-4 mb-5">
             <div>
               <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.2em] block mb-1">Credit Util.</span>
-              <span className="text-lg font-bold text-zinc-200" style={{ fontFamily: "'Space Grotesk'" }}>23%</span>
+              <span className="text-lg font-bold text-zinc-200" style={{ fontFamily: "'Space Grotesk'" }}>{Math.round(creditUtil * 100)}%</span>
             </div>
             <div>
               <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.2em] block mb-1">Total Accts</span>
