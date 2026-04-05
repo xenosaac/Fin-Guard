@@ -8,9 +8,11 @@ Built with Auth0 Token Vault for secure, audited, read-only access.
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
 from app.config import settings
 from app.routers.api import router as api_router
+from app.routers.auth_routes import router as auth_router
 
 app = FastAPI(
     title="Fin-Guard",
@@ -22,6 +24,9 @@ app = FastAPI(
     version="0.1.0",
 )
 
+# Session middleware for Auth0 login state
+app.add_middleware(SessionMiddleware, secret_key=settings.app_secret_key)
+
 # CORS for frontend
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +37,7 @@ app.add_middleware(
 )
 
 app.include_router(api_router)
+app.include_router(auth_router)
 
 
 @app.get("/")
