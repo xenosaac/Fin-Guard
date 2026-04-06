@@ -27,6 +27,12 @@ dist/
 build/
 *.log
 
+# Video / Adobe Premiere Pro
+*.mov
+*.mp4
+*.prproj
+Adobe Premiere Pro */
+
 # Strategy / internal
 STRATEGY.md
 DEMO_SCRIPT.md
